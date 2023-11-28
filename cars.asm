@@ -1,4 +1,4 @@
-  PUBLIC MOVE_CARS
+PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
 .model small
 .stack 64
@@ -21,97 +21,136 @@
   CAR2_VELOCITY_Y  DW 2
   CAR2_ACCELERATION_X DB 1
   CAR2_ACCELERATION_Y DB 1
+
+             ; Normal Shift  CTRL   ALT
+  CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
+            DW 5000h, 5032h, 9100h, 0A000h      ; DOWN ARROW
+            DW 4D00h, 4D36h, 7400h, 9D00h       ; RIGHT ARROW
+            DW 4B00h, 4B34h, 7300h, 9B00h       ; LEFT ARROW
+            DW 0000h    ; NONE
+
+             ; Normal Shift  CTRL   ALT
+  CAR2_KEYS DW 1177h, 1157h, 1117h, 1100h       ; W
+            DW 1F73h, 1F53h, 1F13h, 1F00h       ; S
+            DW 2064h, 2044h, 2004h, 2000h       ; D
+            DW 1E61h, 1E41h, 1E01h, 1E00h       ; A
+            DW 0000h    ; NONE
 .code
 ;-------------------------------------------------------
 ; (Send to CAR file)
 MOVE_CARS proc far
+  PUSH ES
+  mov AX, @data
+  mov ES, AX
+  call READ_BUFFER
+  jz EXIT                 ; ZF = 1 if no key is being pressed
   ; Player One
-  ; Check if any key is being pressed (if not exit)
-  mov AH, 1
-  int 16h
-  jz  MOVE_CAR_2         ; ZF = 0 if no key is being pressed
+  call MOVE_CAR_1
+  cmp CX, 0               ; Key may be associated with player two
+  jz SKIP_READ
+  call READ_BUFFER
+  jz EXIT                 ; ZF = 1 if no key is being pressed
+  SKIP_READ:
+  ; Player Two
+  call MOVE_CAR_2
 
-  ; Get the pressed keys
-  mov AH, 0
-  int 16h                 ; AL = key ascii code
-  PUSH AX
+  ; reset Keyboard Buffer
   mov AH, 0Ch
   int 21h
-  POP AX
-  ; If key is UP ARROW to move up
-  cmp AX, 4800h           ; Normal
-  jz MOVE_UP
-  cmp AX, 4838h           ; Shifted 
-  jz MOVE_UP
-  cmp AX, 8D00h           ; w/CTRL 
-  jz MOVE_UP
-  cmp AX, 9800h           ; w/Alt 
-  jz MOVE_UP
-  ; If key is DOWN ARROW to move down
-  cmp AX, 5000h           ; Normal
-  jz MOVE_DOWN
-  cmp AX, 5032h           ; Shifted 
-  jz MOVE_DOWN
-  cmp AX, 9100h           ; w/CTRL 
-  jz MOVE_DOWN
-  cmp AX, 0A000h          ; w/Alt 
-  jz MOVE_DOWN
-  jmp CHECK_CAR_2
-  MOVE_UP:
-    mov AX, CAR1_VELOCITY_Y
-    sub CAR1_Y, AX
-    jmp MOVE_CAR_2
 
-  MOVE_DOWN:
-    mov AX, CAR1_VELOCITY_Y
-    add CAR1_Y, AX
-    jmp MOVE_CAR_2
-
-  MOVE_CAR_2:
-  ; Check if any key is being pressed (if not exit)
-  mov AH, 1
-  int 16h
-  jz  EXIT_PROC           ; ZF = 0 if no key is being pressed
-
-  ; Get the pressed keys
-  mov AH, 0
-  int 16h                 ; AL = key ascii code
-  PUSH AX
-  mov AH, 0Ch
-  int 21h
-  POP AX
-  CHECK_CAR_2:
-  ; If key is 'w' or 'W' move up
-  cmp AX, 1177h           ; Normal
-  jz MOVE_CAR2_UP
-  cmp AX, 1157h           ; Shifted 
-  jz MOVE_CAR2_UP
-  cmp AX, 1117h           ; w/CTRL 
-  jz MOVE_CAR2_UP
-  cmp AX, 1100h           ; w/Alt 
-  jz MOVE_CAR2_UP
-  ; If key is 's' or 'S' move down
-  cmp AX, 1F73h           ; Normal
-  jz MOVE_CAR2_DOWN
-  cmp AX, 1F53h           ; Shifted 
-  jz MOVE_CAR2_DOWN
-  cmp AX, 1F13h           ; w/CTRL 
-  jz MOVE_CAR2_DOWN
-  cmp AX, 1F00h           ; w/Alt 
-  jz MOVE_CAR2_DOWN
-  jmp EXIT_PROC
-  MOVE_CAR2_UP:
-    mov AX, CAR2_VELOCITY_Y
-    sub CAR2_Y, AX
-    jmp EXIT_PROC
-
-  MOVE_CAR2_DOWN:
-    mov AX, CAR2_VELOCITY_Y
-    add CAR2_Y, AX
-    jmp EXIT_PROC
-  EXIT_PROC:
+  EXIT:
+  POP ES
     ret
 MOVE_CARS endp
+;-------------------------------------------------------
+MOVE_CAR_1 proc near
+  ; Check if key is wanted
+  lea DI, CAR1_KEYS
+  MOV CX, 17              ; Number of car1 keys
+  repne SCASW             ; Search for AX in CAR1_KEYS
+
+  cmp CX, 0
+  jz EXIT_1
+  cmp CX, 4
+  jng MOVE_LEFT_1
+  cmp CX, 8
+  jng MOVE_RIGHT_1
+  cmp CX, 12
+  jng MOVE_DOWN_1
+  jmp MOVE_UP_1
+  MOVE_UP_1:
+    mov AX, CAR1_VELOCITY_Y
+    sub CAR1_Y, AX
+    jmp EXIT_1
+
+  MOVE_DOWN_1:
+    mov AX, CAR1_VELOCITY_Y
+    add CAR1_Y, AX
+    jmp EXIT_1
+
+  MOVE_RIGHT_1:
+    mov AX, CAR1_VELOCITY_X
+    add CAR1_X, AX
+    jmp EXIT_1
+
+  MOVE_LEFT_1:
+    mov AX, CAR1_VELOCITY_X
+    sub CAR1_X, AX
+    jmp EXIT_1
+
+  EXIT_1:
+    ret
+MOVE_CAR_1 endp
+;-------------------------------------------------------
+MOVE_CAR_2 proc near
+  ;Check if key is wanted
+  lea DI, CAR2_KEYS
+  MOV CX, 17              ; Number of car1 keys
+  repne SCASW             ; Search for AX in CAR1_KEYS
+  cmp CX, 0
+  jz EXIT_2
+  cmp CX, 4
+  jng MOVE_LEFT_2
+  cmp CX, 8
+  jng MOVE_RIGHT_2
+  cmp CX, 12
+  jng MOVE_DOWN_2
+  jmp MOVE_UP_2
+  MOVE_UP_2:
+    mov AX, CAR2_VELOCITY_Y
+    sub CAR2_Y, AX
+    jmp EXIT_2
+
+  MOVE_DOWN_2:
+    mov AX, CAR2_VELOCITY_Y
+    add CAR2_Y, AX
+    jmp EXIT_2
+
+  MOVE_RIGHT_2:
+    mov AX, CAR2_VELOCITY_X
+    add CAR2_X, AX
+    jmp EXIT_2
+
+  MOVE_LEFT_2:
+    mov AX, CAR2_VELOCITY_X
+    sub CAR2_X, AX
+    jmp EXIT_2
+
+  EXIT_2:
+    ret
+MOVE_CAR_2 endp
+;-------------------------------------------------------
+READ_BUFFER proc near
+  ; Check if any key is being pressed (if not exit)
+  mov AH, 1
+  int 16h
+  jz  BUFFER_EMPTY        ; ZF = 1 if no key is being pressed
+  ; Get the pressed keys
+  mov AH, 0
+  int 16h
+  BUFFER_EMPTY:
+    ret
+READ_BUFFER endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
   mov CX, CAR1_X    ; Set initial column (X)
@@ -141,7 +180,7 @@ cols:
 
     ret
 DRAW_CAR endp
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;-------------------------------------------------------;
 DRAW_row proc near
     mov cx,5 ;size of all pixels
     rep movsb
