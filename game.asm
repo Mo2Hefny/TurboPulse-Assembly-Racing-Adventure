@@ -27,6 +27,7 @@ main proc far
     int 21h                 ; CH = hour CL = minute DH - second DL = 1/100 seconds
     cmp DL, TIME_AUX        ; fps = 100
     je  CHECK_TIME          ; repeat till time frame changes
+    mov TIME_AUX, DL
   ; Else draw the new frame
   call RESET_BACKGROUND
   ; Draw Cars
@@ -54,6 +55,7 @@ RESET_BACKGROUND proc near
   ret
 RESET_BACKGROUND endp
 ;-------------------------------------------------------
+; (Send to CAR file)
 MOVE_CARS proc near
   ; Player One
   ; Check if any key is being pressed (if not exit)
@@ -83,7 +85,7 @@ MOVE_CARS proc near
   jz MOVE_DOWN
   cmp AX, 0A000h          ; w/Alt 
   jz MOVE_DOWN
-  jz CHECK_CAR_2
+  jmp CHECK_CAR_2
   MOVE_UP:
     mov AX, CAR1_VELOCITY_Y
     sub CAR1_Y, AX
@@ -99,7 +101,6 @@ MOVE_CARS proc near
     ret
 MOVE_CARS endp
 ;-------------------------------------------------------
-; (Send to CAR file)
 DRAW_CARS proc near
   mov CX, CAR1_X    ; Set initial column (X)
   mov DX, CAR1_Y    ; Set initial row (Y)
