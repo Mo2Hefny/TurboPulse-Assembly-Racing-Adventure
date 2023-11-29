@@ -3,22 +3,7 @@
 .model small
 .stack 64
 .data
-  TIME_AUX  DB 0          ; Used when checking if time has changed
-
-  CAR_WIDTH EQU 03h       ; The width of all cars
-  CAR_HEIGHT EQU 07h      ; The height of all cars
-  CAR1_X DW 0Ah           ; X position of the 1st player
-  CAR1_Y DW 0Ah           ; Y position of the 1st player
-  CAR1_VELOCITY_X  DW 2
-  CAR1_VELOCITY_Y  DW 2
-  CAR1_ACCELERATION_X DB 1
-  CAR1_ACCELERATION_Y DB 1
-  CAR2_X DW 0AAh           ; X position of the 1st player
-  CAR2_Y DW 0AAh           ; Y position of the 1st player
-  CAR2_VELOCITY_X  DW 2
-  CAR2_VELOCITY_Y  DW 2
-  CAR2_ACCELERATION_X DB 1
-  CAR2_ACCELERATION_Y DB 1
+  TIME_AUX  DB 0          ; Used when checking if time has changed.code
 .code
 main proc far
 
@@ -27,7 +12,7 @@ main proc far
 
   mov AX, 0A000h
   mov ES, AX
-  
+
   ; Initialize Video Mode
   mov AX, 0013h           ; Select 320x200, 256 color graphics
   int 10h

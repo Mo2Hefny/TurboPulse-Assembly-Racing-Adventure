@@ -1,24 +1,31 @@
-PUBLIC MOVE_CARS
+  PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
 .model small
 .stack 64
 .data
-  img DB 184, 113, 6, 137, 233, 184, 113, 6, 137, 136, 235, 6, 41, 137, 21, 235, 6, 41, 137, 21, 170, 161, 138, 163, 170, 244, 27, 75, 74, 20, 113, 137, 163, 138, 137, 112, 4, 6, 6, 136 
-      DB 185, 113, 113, 111, 209
+  img1 DB 184, 113, 113, 6, 137, 209, 185, 113, 6, 6, 137, 232, 185, 113, 6, 6, 137, 234, 244, 136, 41, 41, 138, 21, 244, 136, 41, 41, 138, 21, 170, 161, 137, 137, 23, 170, 19, 3, 75, 75 
+       DB 74, 19, 185, 160, 25, 25, 163, 234, 112, 6, 6, 6, 6, 136, 184, 113, 6, 6, 137, 210, 185, 113, 113, 113, 113, 185
+  
+  img2 DB 17, 222, 151, 150, 151, 223, 18, 128, 151, 150, 151, 223, 223, 128, 175, 175, 150, 246, 244, 150, 174, 174, 149, 244, 244, 150, 174, 174, 149, 244, 148, 148, 149, 149, 172, 148, 221, 3, 75, 75 
+       DB 74, 221, 223, 148, 3, 3, 172, 246, 223, 150, 175, 175, 174, 151, 223, 151, 150, 150, 150, 223, 200, 223, 223, 223, 223, 200
+       
   TIME_AUX  DB 0          ; Used when checking if time has changed
 
-  CAR_WIDTH EQU 03h       ; The width of all cars
-  CAR_HEIGHT EQU 07h      ; The height of all cars
+  CAR_WIDTH EQU 06h       ; The width of all cars
+  CAR_HEIGHT EQU 0Bh      ; The height of all cars
+  CAR_SPEED EQU 5
   CAR1_X DW 0Ah           ; X position of the 1st player
   CAR1_Y DW 0Ah           ; Y position of the 1st player
-  CAR1_VELOCITY_X  DW 2
-  CAR1_VELOCITY_Y  DW 2
+  CAR1_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
+  CAR1_VELOCITY_X  DW CAR_SPEED
+  CAR1_VELOCITY_Y  DW CAR_SPEED
   CAR1_ACCELERATION_X DB 1
   CAR1_ACCELERATION_Y DB 1
-  CAR2_X DW 0AAh           ; X position of the 1st player
-  CAR2_Y DW 0AAh           ; Y position of the 1st player
-  CAR2_VELOCITY_X  DW 2
-  CAR2_VELOCITY_Y  DW 2
+  CAR2_X DW 0             ; X position of the 1st player
+  CAR2_Y DW 0             ; Y position of the 1st player
+  CAR2_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
+  CAR2_VELOCITY_X  DW CAR_SPEED
+  CAR2_VELOCITY_Y  DW CAR_SPEED
   CAR2_ACCELERATION_X DB 1
   CAR2_ACCELERATION_Y DB 1
 
@@ -80,21 +87,41 @@ MOVE_CAR_1 proc near
   jmp MOVE_UP_1
   MOVE_UP_1:
     mov AX, CAR1_VELOCITY_Y
+    mov CAR1_DIR, 0
+    cmp AX, CAR1_Y
+    jl SKIP_UP_FIX_1
+      mov CAR1_Y, AX
+    SKIP_UP_FIX_1:
     sub CAR1_Y, AX
     jmp EXIT_1
 
   MOVE_DOWN_1:
     mov AX, CAR1_VELOCITY_Y
+    mov CAR1_DIR, 1
     add CAR1_Y, AX
+    cmp CAR1_Y, 199 - CAR_HEIGHT
+    jng SKIP_DOWN_FIX_1
+      mov CAR1_Y, 199 - CAR_HEIGHT
+    SKIP_DOWN_FIX_1:
     jmp EXIT_1
 
   MOVE_RIGHT_1:
     mov AX, CAR1_VELOCITY_X
+    mov CAR1_DIR, 2
     add CAR1_X, AX
+    cmp CAR1_X, 319 - CAR_HEIGHT
+    jng SKIP_RIGHT_FIX_1
+      mov CAR1_X, 319 - CAR_HEIGHT
+    SKIP_RIGHT_FIX_1:
     jmp EXIT_1
 
   MOVE_LEFT_1:
     mov AX, CAR1_VELOCITY_X
+    mov CAR1_DIR, 3
+    cmp AX, CAR1_X
+    jl SKIP_LEFT_FIX_1
+      mov CAR1_X, AX
+    SKIP_LEFT_FIX_1:
     sub CAR1_X, AX
     jmp EXIT_1
 
@@ -118,21 +145,41 @@ MOVE_CAR_2 proc near
   jmp MOVE_UP_2
   MOVE_UP_2:
     mov AX, CAR2_VELOCITY_Y
+    mov CAR2_DIR, 0
+    cmp AX, CAR2_Y
+    jl SKIP_UP_FIX_2
+      mov CAR2_Y, AX
+    SKIP_UP_FIX_2:
     sub CAR2_Y, AX
     jmp EXIT_2
 
   MOVE_DOWN_2:
     mov AX, CAR2_VELOCITY_Y
     add CAR2_Y, AX
+    mov CAR2_DIR, 1
+    cmp CAR2_Y, 199 - CAR_HEIGHT
+    jng SKIP_DOWN_FIX_2
+      mov CAR2_Y, 199 - CAR_HEIGHT
+    SKIP_DOWN_FIX_2:
     jmp EXIT_2
 
   MOVE_RIGHT_2:
     mov AX, CAR2_VELOCITY_X
     add CAR2_X, AX
+    mov CAR2_DIR, 2
+    cmp CAR2_X, 319 - CAR_HEIGHT
+    jng SKIP_RIGHT_FIX_2
+      mov CAR2_X, 319 - CAR_HEIGHT
+    SKIP_RIGHT_FIX_2:
     jmp EXIT_2
 
   MOVE_LEFT_2:
     mov AX, CAR2_VELOCITY_X
+    mov CAR2_DIR, 3
+    cmp AX, CAR2_X
+    jl SKIP_LEFT_FIX_2
+      mov CAR2_X, AX
+    SKIP_LEFT_FIX_2:
     sub CAR2_X, AX
     jmp EXIT_2
 
@@ -155,35 +202,65 @@ READ_BUFFER endp
 DRAW_CARS proc far
   mov CX, CAR1_X    ; Set initial column (X)
   mov DX, CAR1_Y    ; Set initial row (Y)
+  lea si, img1      ;load image adress
+  mov BL, CAR1_DIR  ; Set Face Direction
   call DRAW_CAR
 
   mov CX, CAR2_X    ; Set initial column (X)
   mov DX, CAR2_Y    ; Set initial row (Y)
+  lea si, img2      ;load image adress
+  mov BL, CAR2_DIR  ; Set Face Direction
   call DRAW_CAR
   ret
 DRAW_CARS endp
 ;-------------------------------------------------------
 DRAW_CAR proc near
-    lea si,img  ;load image adress
-    mov AX, DX
-    mov BX, 320
-    mul BX
+    mov AX, 320
+    cmp BL, 1
+    jng  SKIP_DX_ADDITION ; Horizontal
+    add DX, CAR_WIDTH
+    SKIP_DX_ADDITION:
+    mul DX
     add AX, CX
-    mov di, AX   ;load adress  (CX + DX * 320)
-    mov bx, 9 ;number of rows 
-cols:
-    call DRAW_row
-    add di,315
-    dec bx ;check if end condition
-    cmp bx,0
-    jnz cols
+    mov DI, AX            ; load adress  (CX + DX * 320)
+    mov DX, CAR_HEIGHT    ; number of rows
+    cmp BL, 1             
+    jz SKIP_REVERSING     ; Facing Down
+    cmp BL, 2             
+    jz SKIP_REVERSING     ; Facing Right
+    add SI, CAR_HEIGHT * CAR_WIDTH - 1
+    SKIP_REVERSING:
+DRAW_HEIGHT:
+    ; Draw Width
+    mov CX, CAR_WIDTH     ; size of Width
+    TRANSFER:
+        ;cmp SI, 0         ; Pixel is Transparent
+        ;jz  TRANSPARENT
+        MOVSB
+        cmp BL, 1
+        jng  SKIP_DI_ADDITION   ; Horizontal
+        sub DI, 321
+        SKIP_DI_ADDITION:
+        ;TRANSPARENT:
+        cmp BL, 1             
+        jz SKIP_SUBBING     ; Facing Down
+        cmp BL, 2            
+        jz SKIP_SUBBING     ; Facing Right
+        sub SI, 2
+        SKIP_SUBBING:
+        loop TRANSFER
+    ; Go to next Row
+    add DI, 314
+    cmp BL, 1
+    jng  NEXT_BAR   ; Horizontal
+    inc AX
+    mov DI, AX
+    NEXT_BAR:
+    dec DX                ; check if end condition
+    cmp DX, 0
+    jnz DRAW_HEIGHT
 
     ret
 DRAW_CAR endp
 ;-------------------------------------------------------;
-DRAW_row proc near
-    mov cx,5 ;size of all pixels
-    rep movsb
-    ret
-DRAW_row endp
 end
