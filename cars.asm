@@ -15,11 +15,12 @@
   CAR_WIDTH EQU 06h       ; The width of all cars
   CAR_HEIGHT EQU 0Bh      ; The height of all cars
   CAR_SPEED EQU 3
-  ACCELERATION_INCREASE EQU 3
-  ACCELERATION_DECREASE EQU 2
-  MAX_ACCELERATION EQU 20
+  ACCELERATION_INCREASE EQU 2
+  ACCELERATION_DECREASE EQU 1
+  MAX_ACCELERATION EQU 18
   GAME_BORDER_X EQU 320
-  GAME_BORDER_Y EQU 00A0h
+  ;GAME_BORDER_Y EQU 00A0h
+  GAME_BORDER_Y EQU 200
   UP EQU 0
   DOWN EQU 1
   RIGHT EQU 2
@@ -27,13 +28,17 @@
 
   ; Variables
   OLD_TIME_AUX DB 0
+
   CAR1_X DW 0Ah           ; X position of the 1st player
   CAR1_Y DW 5Ah           ; Y position of the 1st player
   CAR1_IMG_DIR DB UP
+  CAR1_MOVEMENT_DIR DB UP
   CAR1_ACCELERATION DW 0
+
   CAR2_X DW 2Fh             ; X position of the 2nd player
   CAR2_Y DW 5Ah             ; Y position of the 2nd player
   CAR2_IMG_DIR DB UP
+  CAR2_MOVEMENT_DIR DB UP
   CAR2_ACCELERATION DW 0
 
              ; Normal Shift  CTRL   ALT
@@ -62,13 +67,12 @@ MOVE_CARS proc far
   ; Player One
   lea DI, CAR1_KEYS
   lea BX, CAR1_IMG_DIR
+  lea SI, CAR1_MOVEMENT_DIR
   call CHECK_INPUT            ; Stores status in CX
-  ;SKIP_INPUT_CHECK:
   lea DI, CAR1_ACCELERATION
   call HANDLE_ACCELERATION
   ; Move PLayer One
   mov AL, CAR1_IMG_DIR
-  mov DX, CAR1_ACCELERATION
   lea DI, CAR1_X
   lea SI, CAR1_Y
   call MOVE_CAR
@@ -83,12 +87,12 @@ MOVE_CARS proc far
   ; Player Two
   lea DI, CAR2_KEYS
   lea BX, CAR2_IMG_DIR
+  lea SI, CAR2_MOVEMENT_DIR
   call CHECK_INPUT            ; Stores status in CX
-  ;lea DI, CAR2_ACCELERATION
-  ;call HANDLE_ACCELERATION
+  lea DI, CAR2_ACCELERATION
+  call HANDLE_ACCELERATION
   ; Move PLayer Two
   mov AL, CAR2_IMG_DIR
-  mov DX, CAR2_ACCELERATION
   lea DI, CAR2_X
   lea SI, CAR2_Y
   call MOVE_CAR
@@ -104,57 +108,117 @@ MOVE_CARS proc far
   ret
 MOVE_CARS endp
 ;-------------------------------------------------------
-CHECK_INPUT proc near         ; DI: CAR_KEYS_TO_CHECK
-  MOV CX, 17              ; Number of car1 keys
-  repne SCASW             ; Search for AX in CAR1_KEYS
-  cmp CX, 0
+CHECK_INPUT proc near         ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
+  MOV CX, 17              ; Number of car input keys
+  repne SCASW             ; Search for AX in CAR_KEYS
   mov AL, [BX]
+  mov AH, [SI]
+  cmp CX, 0
   jz EXIT_CHECK_INPUT
   ; Horizontal Movement
+
   cmp CX, 4
   jg CHECK_IF_RIGHT
+  ; MOVING LEFT
+  mov AH, LEFT
+  cmp AL, RIGHT
+  jz  EXIT_CHECK_INPUT        ; Can't rotate from Right to Left directly
   mov AL, LEFT
   jmp EXIT_CHECK_INPUT
+
   CHECK_IF_RIGHT:
   cmp CX, 8
   jg CHECK_IF_DOWN
+  ; MOVING RIGHT
+  mov AH, RIGHT
+  cmp AL, LEFT
+  jz  EXIT_CHECK_INPUT        ; Can't rotate from Left to Right directly
   mov AL, RIGHT
   jmp EXIT_CHECK_INPUT
+
   CHECK_IF_DOWN:
   ; Vertical Movement
   cmp CX, 12
   jg CHECK_IF_UP
+  ; MOVING DOWN
+  mov AH, DOWN
+  cmp AL, UP
+  jz  EXIT_CHECK_INPUT        ; Can't rotate from Up to Down directly
   mov AL, DOWN
   jmp EXIT_CHECK_INPUT
+
   CHECK_IF_UP:
+  ; MOVING UP
+  mov AH, UP
+  cmp AL, DOWN
+  jz  EXIT_CHECK_INPUT        ; Can't rotate from DOWN to UP directly
   mov AL, UP
+
   EXIT_CHECK_INPUT:
   mov [BX], AL
+  mov [SI], AH
   ret
 CHECK_INPUT endp
 ;-------------------------------------------------------
-HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION
+HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
   cmp CX, 0
   jz DECELERATE
+  mov AL, [BX]
+  mov AH, [SI]
+  XOR AL, AH                            
   mov AX, ACCELERATION_INCREASE
+  jnz NEG_ACCELERATION                  ; Car is reversing
   add [DI], AX
   jmp FIX_1
+  NEG_ACCELERATION:
+  sub [DI], AX
+  jmp FIX_3
+
   DECELERATE:
+  mov AL, 0
+  cmp [DI], AL 
   mov AX, ACCELERATION_DECREASE
+  jl NEG_DECELERATE
   sub [DI], AX
   js FIX_2
   jmp SKIP_ACC_CHECKS
+  NEG_DECELERATE:
+  add [DI], AX
+  jns FIX_2
+  jmp SKIP_ACC_CHECKS
   FIX_1:                      ; Acceleration > MAX_ACCELERATION
-  xor AX, AX
-  mov AL, MAX_ACCELERATION
-  cmp [DI], AX
-  jng SKIP_ACC_CHECKS
+    xor AX, AX
+    mov AL, MAX_ACCELERATION
+    cmp [DI], AX
+    jng SKIP_ACC_CHECKS
     mov [DI], AX
     jmp SKIP_ACC_CHECKS
   FIX_2:
-    xor AX, AX                      ; Acceleration < 0
+    xor AX, AX                      ; |Acceleration| - DECELERATION < 0
     mov [DI], AX
+    jmp SKIP_ACC_CHECKS
+  FIX_3:                            ; Acceleration < NEG_MAX_ACCELERATION
+    xor AX, AX
+    mov AL, MAX_ACCELERATION * -1
+    CBW
+    cmp [DI], AX
+    jnl SKIP_ACC_CHECKS
+    mov [DI], AX
+    jmp SKIP_ACC_CHECKS
   SKIP_ACC_CHECKS:
+  ; Position = Position + (Velocity + Boost) * Acceleration
+  ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
+  XOR AX, AX
+  mov AL, [DI]
+  mov DL, CAR_SPEED
+  imul DL                      ; (Velocity + Boost) * Acceleration(DX)
+  ;mov DL, TIME_AUX
+  ;sub DL, OLD_TIME_AUX        ; delta(T) = New T - Old T
+  ;mul DL                      ; (Velocity + Boost) * Acceleration(DX) * delta(T)
+                              ; NOT WORKING XD
+  mov CL, 3                            
+  SAR AX, CL                  ; To make acceleration smaller
+  mov DX, AX                  ; (Velocity + Boost) * Acceleration(DX)
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
@@ -192,17 +256,6 @@ MOVE_CAR proc near
 MOVE_CAR endp
 ;-------------------------------------------------------
 MOVE_UP_PROC proc near        ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
-    mov AL, 0                 ; Store Car Direction
-    mov [BX], AL              ; Store Car Direction
-    ; Position = Position + (Velocity + Boost) * Acceleration
-    ; DX = (Velocity + Boost) * Acceleration(DX)
-    xor AX, AX
-    mov AL, CAR_SPEED
-    mul DX
-    mov DL, 10
-    div DL                   ; AH = 5, AL = 1
-    xor AH, AH
-    mov DX, AX
     cmp DX, [SI]              ; Point < Car_Y    
     jl SKIP_UP_FIX
       mov [SI], DX
@@ -213,8 +266,6 @@ MOVE_UP_PROC endp
 ;-------------------------------------------------------
 MOVE_DOWN_PROC proc near      ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
     add [SI], DX
-    mov AL, 1
-    mov [BX], AL
     mov AX, GAME_BORDER_Y - 1 - CAR_HEIGHT
     cmp [SI], AX
     jng SKIP_DOWN_FIX
@@ -225,8 +276,6 @@ MOVE_DOWN_PROC endp
 ;-------------------------------------------------------
 MOVE_RIGHT_PROC proc near     ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     add [DI], DX              ; DI = CAR_X
-    mov AL, 2                 ; Store Car Direction
-    mov [BX], AL              ; Store Car Direction
     mov AX, GAME_BORDER_X - 1 - CAR_HEIGHT 
     cmp [DI], AX           
     jng SKIP_RIGHT_FIX
@@ -236,8 +285,6 @@ MOVE_RIGHT_PROC proc near     ; DX: Velocity, [BX]: Direction, [DI]: Car_X
 MOVE_RIGHT_PROC endp
 ;-------------------------------------------------------
 MOVE_LEFT_PROC proc near      ; DX: Velocity, [BX]: Direction, [DI]: Car_X
-    mov AL, 3                 ; Store Car Direction
-    mov [BX], AL              ; Store Car Direction
     cmp DX, [DI]              ; DI = CAR_X
     jl SKIP_LEFT_FIX
       mov [DI], DX
