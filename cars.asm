@@ -24,15 +24,15 @@
   CAR1_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
   CAR1_VELOCITY_X  DW CAR_SPEED
   CAR1_VELOCITY_Y  DW CAR_SPEED
-  CAR1_ACCELERATION_X DW 0
-  CAR1_ACCELERATION_Y DW 0
+  CAR1_ACCELERATION_X DW 3
+  CAR1_ACCELERATION_Y DW 3
   CAR2_X DW 0             ; X position of the 1st player
   CAR2_Y DW 0             ; Y position of the 1st player
   CAR2_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
   CAR2_VELOCITY_X  DW CAR_SPEED
   CAR2_VELOCITY_Y  DW CAR_SPEED
-  CAR2_ACCELERATION_X DW 0
-  CAR2_ACCELERATION_Y DW 0
+  CAR2_ACCELERATION_X DW 3
+  CAR2_ACCELERATION_Y DW 3
 
              ; Normal Shift  CTRL   ALT
   CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
@@ -126,7 +126,7 @@ MOVE_CAR_2 proc near
   cmp CX, 0
   jz EXIT_2
   ; Horizontal Movement
-  mov DX, CAR2_VELOCITY_X
+  mov DX, CAR2_ACCELERATION_X
   lea BX, CAR2_DIR
   lea DI, CAR2_X
   cmp CX, 4
@@ -134,7 +134,7 @@ MOVE_CAR_2 proc near
   cmp CX, 8
   jng MOVE_RIGHT_2
   ; Vertical Movement
-  mov DX, CAR2_VELOCITY_Y
+  mov DX, CAR2_ACCELERATION_Y
   lea BX, CAR2_DIR
   lea DI, CAR2_Y
   cmp CX, 12
@@ -161,10 +161,17 @@ MOVE_CAR_2 proc near
 MOVE_CAR_2 endp
 ;-------------------------------------------------------
 MOVE_UP proc near             ; DX: Velocity, [BX]: Direction, [DI]: Car_Y
-    ; Position = Position + (Velocity + Boost) * Acceleration
-    ; Add = (Velocity + Boost) * Acceleration
     mov AL, 0                 ; Store Car Direction
     mov [BX], AL              ; Store Car Direction
+    ; Position = Position + (Velocity + Boost) * Acceleration
+    ; DX = (Velocity + Boost) * Acceleration(DX)
+    xor AX, AX
+    mov AL, CAR_SPEED
+    mul DX
+    mov DL, 10
+    div DL                   ; AH = 5, AL = 1     ; (DIV IS NOT WORKING TEST IT)
+    xor AH, AH
+    mov DX, AX
     cmp DX, [DI]              ; Point < Car_Y    
     jl SKIP_UP_FIX
       mov [DI], DX
