@@ -1,5 +1,6 @@
   EXTRN DRAW_CARS:FAR
   EXTRN MOVE_CARS:FAR
+  PUBLIC TIME_AUX
 .model small
 .stack 64
 .data
@@ -17,7 +18,13 @@ main proc far
   mov AX, 0013h           ; Select 320x200, 256 color graphics
   int 10h
   
-  
+  ; By default, there are 16 colors for text and only 8 colors for background.
+  ; There is a way to get all the 16 colors for background, which requires turning off the "blinking attribute".
+  ; Toggle Intensity/Blinking Bit
+  mov AX, 1003h
+  mov BX, 0000h               ; 00h Background intensity enabled
+                              ; 01h Blink enabled
+  int 10h
 
   ; Get the systen time
   CHECK_TIME:
