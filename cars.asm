@@ -1,38 +1,40 @@
+  EXTRN TIME_AUX:BYTE
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
 .model small
 .stack 64
 .data
+  ; Red Car
   img1 DB 184, 113, 113, 6, 137, 209, 185, 113, 6, 6, 137, 232, 185, 113, 6, 6, 137, 234, 244, 136, 41, 41, 138, 21, 244, 136, 41, 41, 138, 21, 170, 161, 137, 137, 23, 170, 19, 3, 75, 75 
        DB 74, 19, 185, 160, 25, 25, 163, 234, 112, 6, 6, 6, 6, 136, 184, 113, 6, 6, 137, 210, 185, 113, 113, 113, 113, 185
-  
+  ; Blue Car
   img2 DB 17, 222, 151, 150, 151, 223, 18, 128, 151, 150, 151, 223, 223, 128, 175, 175, 150, 246, 244, 150, 174, 174, 149, 244, 244, 150, 174, 174, 149, 244, 148, 148, 149, 149, 172, 148, 221, 3, 75, 75 
        DB 74, 221, 223, 148, 3, 3, 172, 246, 223, 150, 175, 175, 174, 151, 223, 151, 150, 150, 150, 223, 200, 223, 223, 223, 223, 200
        
-
-
+  ; Constants
   CAR_WIDTH EQU 06h       ; The width of all cars
   CAR_HEIGHT EQU 0Bh      ; The height of all cars
-  CAR_SPEED EQU 5
+  CAR_SPEED EQU 3
   ACCELERATION_INCREASE EQU 3
-  ACCELERATION_DECREASE EQU 3
-  MAX_ACCELERATION EQU 10
+  ACCELERATION_DECREASE EQU 2
+  MAX_ACCELERATION EQU 20
   GAME_BORDER_X EQU 320
   GAME_BORDER_Y EQU 00A0h
+  UP EQU 0
+  DOWN EQU 1
+  RIGHT EQU 2
+  LEFT EQU 3
+
+  ; Variables
+  OLD_TIME_AUX DB 0
   CAR1_X DW 0Ah           ; X position of the 1st player
-  CAR1_Y DW 0Ah           ; Y position of the 1st player
-  CAR1_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
-  CAR1_VELOCITY_X  DW CAR_SPEED
-  CAR1_VELOCITY_Y  DW CAR_SPEED
-  CAR1_ACCELERATION_X DW 3
-  CAR1_ACCELERATION_Y DW 3
-  CAR2_X DW 0             ; X position of the 1st player
-  CAR2_Y DW 0             ; Y position of the 1st player
-  CAR2_DIR DB 0           ; 0 UP, 1 DOWN, 2 RIGHT, 3 LEFT
-  CAR2_VELOCITY_X  DW CAR_SPEED
-  CAR2_VELOCITY_Y  DW CAR_SPEED
-  CAR2_ACCELERATION_X DW 3
-  CAR2_ACCELERATION_Y DW 3
+  CAR1_Y DW 5Ah           ; Y position of the 1st player
+  CAR1_IMG_DIR DB UP
+  CAR1_ACCELERATION DW 0
+  CAR2_X DW 2Fh             ; X position of the 2nd player
+  CAR2_Y DW 5Ah             ; Y position of the 2nd player
+  CAR2_IMG_DIR DB UP
+  CAR2_ACCELERATION DW 0
 
              ; Normal Shift  CTRL   ALT
   CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
@@ -49,118 +51,147 @@
             DW 0000h    ; NONE
 .code
 ;-------------------------------------------------------
-; (Send to CAR file)
 MOVE_CARS proc far
   PUSH ES
   mov AX, @data
   mov ES, AX
+  mov CX, 0
   call READ_BUFFER
-  jz EXIT                 ; ZF = 1 if no key is being pressed
+  ;jz SKIP_INPUT_CHECK         ; ZF = 1 if no key is being pressed
+
   ; Player One
-  call MOVE_CAR_1
-  cmp CX, 0               ; Key may be associated with player two
+  lea DI, CAR1_KEYS
+  lea BX, CAR1_IMG_DIR
+  call CHECK_INPUT            ; Stores status in CX
+  ;SKIP_INPUT_CHECK:
+  lea DI, CAR1_ACCELERATION
+  call HANDLE_ACCELERATION
+  ; Move PLayer One
+  mov AL, CAR1_IMG_DIR
+  mov DX, CAR1_ACCELERATION
+  lea DI, CAR1_X
+  lea SI, CAR1_Y
+  call MOVE_CAR
+
+  ; Key may be associated with player two
+  cmp CX, 0                   ; Key didn't belong to player one
   jz SKIP_READ
   call READ_BUFFER
-  jz EXIT                 ; ZF = 1 if no key is being pressed
+  jz EXIT_MOVE_CARS           ; ZF = 1 if no key is being pressed
   SKIP_READ:
+
   ; Player Two
-  call MOVE_CAR_2
+  lea DI, CAR2_KEYS
+  lea BX, CAR2_IMG_DIR
+  call CHECK_INPUT            ; Stores status in CX
+  ;lea DI, CAR2_ACCELERATION
+  ;call HANDLE_ACCELERATION
+  ; Move PLayer Two
+  mov AL, CAR2_IMG_DIR
+  mov DX, CAR2_ACCELERATION
+  lea DI, CAR2_X
+  lea SI, CAR2_Y
+  call MOVE_CAR
 
   ; reset Keyboard Buffer
   mov AH, 0Ch
   int 21h
 
-  EXIT:
+  EXIT_MOVE_CARS:
   POP ES
-    ret
+  mov AL, TIME_AUX
+  mov OLD_TIME_AUX, AL
+  ret
 MOVE_CARS endp
 ;-------------------------------------------------------
-MOVE_CAR_1 proc near
-  ; Check if key is wanted
-  lea DI, CAR1_KEYS
-  MOV CX, 17              ; Number of car1 keys
-  repne SCASW             ; Search for AX in CAR1_KEYS
-
-  cmp CX, 0
-  jz EXIT_1
-  cmp CX, 4
-  ; Horizontal Movement
-  mov DX, CAR1_VELOCITY_X
-  lea BX, CAR1_DIR
-  lea DI, CAR1_X
-  jng MOVE_LEFT_1
-  cmp CX, 8
-  jng MOVE_RIGHT_1
-  ; Vertical Movement
-  mov DX, CAR1_VELOCITY_Y
-  lea BX, CAR1_DIR
-  lea DI, CAR1_Y
-  cmp CX, 12
-  jng MOVE_DOWN_1
-  jmp MOVE_UP_1
-  MOVE_UP_1:
-    call MOVE_UP
-    jmp EXIT_1
-
-  MOVE_DOWN_1:
-    call MOVE_DOWN
-    jmp EXIT_1
-
-  MOVE_RIGHT_1:
-    call MOVE_RIGHT
-    jmp EXIT_1
-
-  MOVE_LEFT_1:
-    call MOVE_LEFT
-    jmp EXIT_1
-
-  EXIT_1:
-    ret
-MOVE_CAR_1 endp
-;-------------------------------------------------------
-MOVE_CAR_2 proc near
-  ;Check if key is wanted
-  lea DI, CAR2_KEYS
+CHECK_INPUT proc near         ; DI: CAR_KEYS_TO_CHECK
   MOV CX, 17              ; Number of car1 keys
   repne SCASW             ; Search for AX in CAR1_KEYS
   cmp CX, 0
-  jz EXIT_2
+  mov AL, [BX]
+  jz EXIT_CHECK_INPUT
   ; Horizontal Movement
-  mov DX, CAR2_ACCELERATION_X
-  lea BX, CAR2_DIR
-  lea DI, CAR2_X
   cmp CX, 4
-  jng MOVE_LEFT_2
+  jg CHECK_IF_RIGHT
+  mov AL, LEFT
+  jmp EXIT_CHECK_INPUT
+  CHECK_IF_RIGHT:
   cmp CX, 8
-  jng MOVE_RIGHT_2
+  jg CHECK_IF_DOWN
+  mov AL, RIGHT
+  jmp EXIT_CHECK_INPUT
+  CHECK_IF_DOWN:
   ; Vertical Movement
-  mov DX, CAR2_ACCELERATION_Y
-  lea BX, CAR2_DIR
-  lea DI, CAR2_Y
   cmp CX, 12
-  jng MOVE_DOWN_2
-  jmp MOVE_UP_2
-  MOVE_UP_2:
-    call MOVE_UP
-    jmp EXIT_2
-
-  MOVE_DOWN_2:
-    call MOVE_DOWN
-    jmp EXIT_2
-
-  MOVE_RIGHT_2:
-    call MOVE_RIGHT
-    jmp EXIT_2
-
-  MOVE_LEFT_2:
-    call MOVE_LEFT
-    jmp EXIT_2
-
-  EXIT_2:
-    ret
-MOVE_CAR_2 endp
+  jg CHECK_IF_UP
+  mov AL, DOWN
+  jmp EXIT_CHECK_INPUT
+  CHECK_IF_UP:
+  mov AL, UP
+  EXIT_CHECK_INPUT:
+  mov [BX], AL
+  ret
+CHECK_INPUT endp
 ;-------------------------------------------------------
-MOVE_UP proc near             ; DX: Velocity, [BX]: Direction, [DI]: Car_Y
+HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION
+  cmp CX, 0
+  jz DECELERATE
+  mov AX, ACCELERATION_INCREASE
+  add [DI], AX
+  jmp FIX_1
+  DECELERATE:
+  mov AX, ACCELERATION_DECREASE
+  sub [DI], AX
+  js FIX_2
+  jmp SKIP_ACC_CHECKS
+  FIX_1:                      ; Acceleration > MAX_ACCELERATION
+  xor AX, AX
+  mov AL, MAX_ACCELERATION
+  cmp [DI], AX
+  jng SKIP_ACC_CHECKS
+    mov [DI], AX
+    jmp SKIP_ACC_CHECKS
+  FIX_2:
+    xor AX, AX                      ; Acceleration < 0
+    mov [DI], AX
+  SKIP_ACC_CHECKS:
+  ret
+HANDLE_ACCELERATION endp
+;-------------------------------------------------------
+MOVE_CAR proc near
+  ; Move Car According To The Current Direction
+  ;cmp CX, 0
+  ;jz EXIT_MOVE_CAR
+  ; Horizontal Movement
+  cmp AL, LEFT
+  jz MOVE_LEFT
+  cmp AL, RIGHT
+  jz MOVE_RIGHT
+  ; Vertical Movement
+  cmp AL, DOWN
+  jz MOVE_DOWN
+  jmp MOVE_UP
+  MOVE_UP:
+    call MOVE_UP_PROC
+    jmp EXIT_MOVE_CAR
+
+  MOVE_DOWN:
+    call MOVE_DOWN_PROC
+    jmp EXIT_MOVE_CAR
+
+  MOVE_RIGHT:
+    call MOVE_RIGHT_PROC
+    jmp EXIT_MOVE_CAR
+
+  MOVE_LEFT:
+    call MOVE_LEFT_PROC
+    jmp EXIT_MOVE_CAR
+
+  EXIT_MOVE_CAR:
+    ret
+MOVE_CAR endp
+;-------------------------------------------------------
+MOVE_UP_PROC proc near        ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
     mov AL, 0                 ; Store Car Direction
     mov [BX], AL              ; Store Car Direction
     ; Position = Position + (Velocity + Boost) * Acceleration
@@ -169,30 +200,30 @@ MOVE_UP proc near             ; DX: Velocity, [BX]: Direction, [DI]: Car_Y
     mov AL, CAR_SPEED
     mul DX
     mov DL, 10
-    div DL                   ; AH = 5, AL = 1     ; (DIV IS NOT WORKING TEST IT)
+    div DL                   ; AH = 5, AL = 1
     xor AH, AH
     mov DX, AX
-    cmp DX, [DI]              ; Point < Car_Y    
+    cmp DX, [SI]              ; Point < Car_Y    
     jl SKIP_UP_FIX
-      mov [DI], DX
+      mov [SI], DX
     SKIP_UP_FIX:
-    sub [DI], DX
+    sub [SI], DX
     ret
-MOVE_UP endp
+MOVE_UP_PROC endp
 ;-------------------------------------------------------
-MOVE_DOWN proc near           ; DX: Velocity, [BX]: Direction, [DI]: Car_Y
-    add [DI], DX
+MOVE_DOWN_PROC proc near      ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
+    add [SI], DX
     mov AL, 1
     mov [BX], AL
     mov AX, GAME_BORDER_Y - 1 - CAR_HEIGHT
-    cmp [DI], AX
+    cmp [SI], AX
     jng SKIP_DOWN_FIX
-      mov [DI], AX
+      mov [SI], AX
     SKIP_DOWN_FIX:
     ret
-MOVE_DOWN endp
+MOVE_DOWN_PROC endp
 ;-------------------------------------------------------
-MOVE_RIGHT proc near          ; DX: Velocity, [BX]: Direction, [DI]: Car_X
+MOVE_RIGHT_PROC proc near     ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     add [DI], DX              ; DI = CAR_X
     mov AL, 2                 ; Store Car Direction
     mov [BX], AL              ; Store Car Direction
@@ -202,9 +233,9 @@ MOVE_RIGHT proc near          ; DX: Velocity, [BX]: Direction, [DI]: Car_X
       mov [DI], AX
     SKIP_RIGHT_FIX:
     ret
-MOVE_RIGHT endp
+MOVE_RIGHT_PROC endp
 ;-------------------------------------------------------
-MOVE_LEFT proc near           ; DX: Velocity, [BX]: Direction, [DI]: Car_X
+MOVE_LEFT_PROC proc near      ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     mov AL, 3                 ; Store Car Direction
     mov [BX], AL              ; Store Car Direction
     cmp DX, [DI]              ; DI = CAR_X
@@ -213,7 +244,7 @@ MOVE_LEFT proc near           ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     SKIP_LEFT_FIX:
     sub [DI], DX
     ret
-MOVE_LEFT endp
+MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
 READ_BUFFER proc near
   ; Check if any key is being pressed (if not exit)
@@ -231,13 +262,13 @@ DRAW_CARS proc far
   mov CX, CAR1_X    ; Set initial column (X)
   mov DX, CAR1_Y    ; Set initial row (Y)
   lea si, img1      ;load image adress
-  mov BL, CAR1_DIR  ; Set Face Direction
+  mov BL, CAR1_IMG_DIR  ; Set Face Direction
   call DRAW_CAR
 
   mov CX, CAR2_X    ; Set initial column (X)
   mov DX, CAR2_Y    ; Set initial row (Y)
   lea si, img2      ;load image adress
-  mov BL, CAR2_DIR  ; Set Face Direction
+  mov BL, CAR2_IMG_DIR  ; Set Face Direction
   call DRAW_CAR
   ret
 DRAW_CARS endp
