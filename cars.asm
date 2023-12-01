@@ -18,9 +18,11 @@
   ACCELERATION_INCREASE EQU 2
   ACCELERATION_DECREASE EQU 1
   MAX_ACCELERATION EQU 18
-  GAME_BORDER_X EQU 320
+  GAME_BORDER_X_MIN EQU 0
+  GAME_BORDER_X_MAX EQU 320
   ;GAME_BORDER_Y EQU 00A0h
-  GAME_BORDER_Y EQU 200
+  GAME_BORDER_Y_MIN EQU 0
+  GAME_BORDER_Y_MAX EQU 200
   UP EQU 0
   DOWN EQU 1
   RIGHT EQU 2
@@ -81,7 +83,7 @@ MOVE_CARS proc far
   cmp CX, 0                   ; Key didn't belong to player one
   jz SKIP_READ
   call READ_BUFFER
-  jz EXIT_MOVE_CARS           ; ZF = 1 if no key is being pressed
+  ;jz EXIT_MOVE_CARS           ; ZF = 1 if no key is being pressed
   SKIP_READ:
 
   ; Player Two
@@ -108,7 +110,19 @@ MOVE_CARS proc far
   ret
 MOVE_CARS endp
 ;-------------------------------------------------------
-CHECK_INPUT proc near         ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
+READ_BUFFER proc near
+  ; Check if any key is being pressed (if not exit)
+  mov AH, 1
+  int 16h
+  jz  BUFFER_EMPTY        ; ZF = 1 if no key is being pressed
+  ; Get the pressed keys
+  mov AH, 0
+  int 16h
+  BUFFER_EMPTY:
+    ret
+READ_BUFFER endp
+;-------------------------------------------------------
+CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
   MOV CX, 17              ; Number of car input keys
   repne SCASW             ; Search for AX in CAR_KEYS
   mov AL, [BX]
@@ -222,10 +236,8 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
-MOVE_CAR proc near
+MOVE_CAR proc near                      ; [AL]: CAR_IMG_DIR, [DI]: CAR_X, [SI]: CAR_Y, DX: Velocity
   ; Move Car According To The Current Direction
-  ;cmp CX, 0
-  ;jz EXIT_MOVE_CAR
   ; Horizontal Movement
   cmp AL, LEFT
   jz MOVE_LEFT
@@ -252,58 +264,57 @@ MOVE_CAR proc near
     jmp EXIT_MOVE_CAR
 
   EXIT_MOVE_CAR:
+  call FIX_BOUNDARIES_CONDITION
     ret
 MOVE_CAR endp
 ;-------------------------------------------------------
-MOVE_UP_PROC proc near        ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
-    cmp DX, [SI]              ; Point < Car_Y    
-    jl SKIP_UP_FIX
-      mov [SI], DX
-    SKIP_UP_FIX:
+MOVE_UP_PROC proc near                  ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
     sub [SI], DX
     ret
 MOVE_UP_PROC endp
 ;-------------------------------------------------------
-MOVE_DOWN_PROC proc near      ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
+MOVE_DOWN_PROC proc near                ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
     add [SI], DX
-    mov AX, GAME_BORDER_Y - 1 - CAR_HEIGHT
-    cmp [SI], AX
-    jng SKIP_DOWN_FIX
-      mov [SI], AX
-    SKIP_DOWN_FIX:
     ret
 MOVE_DOWN_PROC endp
 ;-------------------------------------------------------
-MOVE_RIGHT_PROC proc near     ; DX: Velocity, [BX]: Direction, [DI]: Car_X
+MOVE_RIGHT_PROC proc near               ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     add [DI], DX              ; DI = CAR_X
-    mov AX, GAME_BORDER_X - 1 - CAR_HEIGHT 
-    cmp [DI], AX           
-    jng SKIP_RIGHT_FIX
-      mov [DI], AX
-    SKIP_RIGHT_FIX:
     ret
 MOVE_RIGHT_PROC endp
 ;-------------------------------------------------------
-MOVE_LEFT_PROC proc near      ; DX: Velocity, [BX]: Direction, [DI]: Car_X
-    cmp DX, [DI]              ; DI = CAR_X
-    jl SKIP_LEFT_FIX
-      mov [DI], DX
-    SKIP_LEFT_FIX:
+MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: Car_X
     sub [DI], DX
     ret
 MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
-READ_BUFFER proc near
-  ; Check if any key is being pressed (if not exit)
-  mov AH, 1
-  int 16h
-  jz  BUFFER_EMPTY        ; ZF = 1 if no key is being pressed
-  ; Get the pressed keys
-  mov AH, 0
-  int 16h
-  BUFFER_EMPTY:
-    ret
-READ_BUFFER endp
+FIX_BOUNDARIES_CONDITION proc near      ; [DI]: CAR_X, [SI]: CAR_Y
+  ; X < 0
+  mov AX, GAME_BORDER_X_MIN
+  cmp [DI], AX
+  jl FIX_X
+  ; X > X_Limit
+  mov AX, GAME_BORDER_X_MAX - 1 - CAR_HEIGHT
+  cmp [DI], AX
+  jg FIX_X
+  jmp SKIP_FIX_X
+  FIX_X:
+  mov [DI], AX
+  SKIP_FIX_X:
+  ; Y < 0
+  mov AX, GAME_BORDER_Y_MIN
+  cmp [SI], AX
+  jl FIX_Y
+  ; Y > Y_Limit
+  mov AX, GAME_BORDER_Y_MAX - 1 - CAR_HEIGHT
+  cmp [SI], AX
+  jg FIX_Y
+  jmp SKIP_FIX_Y
+  FIX_Y:
+  mov [SI], AX
+  SKIP_FIX_Y:
+  ret
+FIX_BOUNDARIES_CONDITION endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
   mov CX, CAR1_X    ; Set initial column (X)
