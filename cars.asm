@@ -64,40 +64,48 @@ MOVE_CARS proc far
   mov ES, AX
   mov CX, 0
   call READ_BUFFER
-  ;jz SKIP_INPUT_CHECK         ; ZF = 1 if no key is being pressed
 
   ; Player One
   lea DI, CAR1_KEYS
   lea BX, CAR1_IMG_DIR
   lea SI, CAR1_MOVEMENT_DIR
-  call CHECK_INPUT            ; Stores status in CX
+  call CHECK_INPUT                      ; Stores status in CX
+  ; Simulate acceleration for player one
   lea DI, CAR1_ACCELERATION
-  call HANDLE_ACCELERATION
+  call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
   ; Move PLayer One
   mov AL, CAR1_IMG_DIR
   lea DI, CAR1_X
   lea SI, CAR1_Y
   call MOVE_CAR
+  ; RESET DIRECTION IF CAR IS AT REST
+  mov AL, CAR1_IMG_DIR
+  lea SI, CAR1_MOVEMENT_DIR
+  call CAR_AT_REST
 
   ; Key may be associated with player two
-  cmp CX, 0                   ; Key didn't belong to player one
+  cmp CX, 0                             ; Key didn't belong to player one
   jz SKIP_READ
   call READ_BUFFER
-  ;jz EXIT_MOVE_CARS           ; ZF = 1 if no key is being pressed
   SKIP_READ:
 
   ; Player Two
   lea DI, CAR2_KEYS
   lea BX, CAR2_IMG_DIR
   lea SI, CAR2_MOVEMENT_DIR
-  call CHECK_INPUT            ; Stores status in CX
+  call CHECK_INPUT                      ; Stores status in CX
+  ; Simulate acceleration for player two
   lea DI, CAR2_ACCELERATION
-  call HANDLE_ACCELERATION
+  call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
   ; Move PLayer Two
   mov AL, CAR2_IMG_DIR
   lea DI, CAR2_X
   lea SI, CAR2_Y
   call MOVE_CAR
+  ; RESET DIRECTION IF CAR IS AT REST
+  mov AL, CAR2_IMG_DIR
+  lea SI, CAR2_MOVEMENT_DIR
+  call CAR_AT_REST
 
   ; reset Keyboard Buffer
   mov AH, 0Ch
@@ -123,56 +131,72 @@ READ_BUFFER proc near
 READ_BUFFER endp
 ;-------------------------------------------------------
 CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
-  MOV CX, 17              ; Number of car input keys
-  repne SCASW             ; Search for AX in CAR_KEYS
+  MOV CX, 17                            ; Number of car input keys
+  repne SCASW                           ; Search for AX in CAR_KEYS
   mov AL, [BX]
   mov AH, [SI]
   cmp CX, 0
   jz EXIT_CHECK_INPUT
   ; Horizontal Movement
-
+  ; LEFT
   cmp CX, 4
-  jg CHECK_IF_RIGHT
-  ; MOVING LEFT
-  mov AH, LEFT
-  cmp AL, RIGHT
-  jz  EXIT_CHECK_INPUT        ; Can't rotate from Right to Left directly
-  mov AL, LEFT
-  jmp EXIT_CHECK_INPUT
-
-  CHECK_IF_RIGHT:
+  jng MOVEMENT_LEFT
+  ; RIGHT
   cmp CX, 8
-  jg CHECK_IF_DOWN
-  ; MOVING RIGHT
-  mov AH, RIGHT
-  cmp AL, LEFT
-  jz  EXIT_CHECK_INPUT        ; Can't rotate from Left to Right directly
-  mov AL, RIGHT
-  jmp EXIT_CHECK_INPUT
-
-  CHECK_IF_DOWN:
+  jng MOVEMENT_RIGHT
   ; Vertical Movement
+  ; DOWN
   cmp CX, 12
-  jg CHECK_IF_UP
-  ; MOVING DOWN
-  mov AH, DOWN
-  cmp AL, UP
-  jz  EXIT_CHECK_INPUT        ; Can't rotate from Up to Down directly
-  mov AL, DOWN
+  jng MOVEMENT_DOWN
+  ; UP
+  jmp MOVEMENT_UP
+
+  MOVEMENT_LEFT:
+  mov DH, LEFT
+  mov DL, RIGHT
+  call CHANGE_DIRECTION
   jmp EXIT_CHECK_INPUT
 
-  CHECK_IF_UP:
-  ; MOVING UP
-  mov AH, UP
-  cmp AL, DOWN
-  jz  EXIT_CHECK_INPUT        ; Can't rotate from DOWN to UP directly
-  mov AL, UP
+  MOVEMENT_RIGHT:
+  mov DH, RIGHT
+  mov DL, LEFT
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_DOWN:
+  mov DH, DOWN
+  mov DL, UP
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_UP:
+  mov DH, UP
+  mov DL, DOWN
+  call CHANGE_DIRECTION
 
   EXIT_CHECK_INPUT:
   mov [BX], AL
   mov [SI], AH
   ret
 CHECK_INPUT endp
+;-------------------------------------------------------
+CHANGE_DIRECTION proc near              ; AH: MOVEMENT_DIR, AL: IMG_DIR, DH: NEW_DIR, DL: Opposite_DIR, AH: 0 if normal
+  cmp AH, AL                            ; (CURR_IMG != CURR_MOVEMENT)
+  jz NOT_BACK_ROTATION
+  cmp AH, DH                            ; NEW_MOVEMENT != CURR_IMG or CURR_MOVEMENT
+  jz NOT_BACK_ROTATION
+  cmp AL, DH                            ; NEW_MOVEMENT != CURR_IMG or CURR_MOVEMENT
+  jz NOT_BACK_ROTATION
+  mov AL, DL                            ; The Car is steering while reversing   
+  jmp EXIT_CHANGE_DIRECTION
+  NOT_BACK_ROTATION:
+  cmp AL, DL                            ; CURR_IMG == OPPOSITE_MOVEMENT, So the Car is in REVERSE
+  jz  EXIT_CHANGE_DIRECTION             ; Can't rotate 180deg directly
+  mov AL, DH
+  EXIT_CHANGE_DIRECTION:
+  mov AH, DH
+  ret
+CHANGE_DIRECTION endp
 ;-------------------------------------------------------
 HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
   cmp CX, 0
@@ -200,7 +224,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   add [DI], AX
   jns FIX_2
   jmp SKIP_ACC_CHECKS
-  FIX_1:                      ; Acceleration > MAX_ACCELERATION
+  FIX_1:                                ; Acceleration > MAX_ACCELERATION
     xor AX, AX
     mov AL, MAX_ACCELERATION
     cmp [DI], AX
@@ -208,10 +232,10 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
     mov [DI], AX
     jmp SKIP_ACC_CHECKS
   FIX_2:
-    xor AX, AX                      ; |Acceleration| - DECELERATION < 0
+    xor AX, AX                          ; |Acceleration| - DECELERATION < 0
     mov [DI], AX
     jmp SKIP_ACC_CHECKS
-  FIX_3:                            ; Acceleration < NEG_MAX_ACCELERATION
+  FIX_3:                                ; Acceleration < NEG_MAX_ACCELERATION
     xor AX, AX
     mov AL, MAX_ACCELERATION * -1
     CBW
@@ -236,7 +260,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
-MOVE_CAR proc near                      ; [AL]: CAR_IMG_DIR, [DI]: CAR_X, [SI]: CAR_Y, DX: Velocity
+MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_X, [SI]: CAR_Y, DX: Velocity
   ; Move Car According To The Current Direction
   ; Horizontal Movement
   cmp AL, LEFT
@@ -316,26 +340,35 @@ FIX_BOUNDARIES_CONDITION proc near      ; [DI]: CAR_X, [SI]: CAR_Y
   ret
 FIX_BOUNDARIES_CONDITION endp
 ;-------------------------------------------------------
+CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
+  cmp DX, 0
+  jnz EXIT_CAR_AT_REST
+    mov [SI], AL
+  EXIT_CAR_AT_REST:
+  ret
+CAR_AT_REST endp
+;-------------------------------------------------------
+;-------------------------------------------------------
 DRAW_CARS proc far
-  mov CX, CAR1_X    ; Set initial column (X)
-  mov DX, CAR1_Y    ; Set initial row (Y)
-  lea si, img1      ;load image adress
-  mov BL, CAR1_IMG_DIR  ; Set Face Direction
+  mov CX, CAR1_X                        ; Set initial column (X)
+  mov DX, CAR1_Y                        ; Set initial row (Y)
+  lea SI, img1                          ; Load image adress
+  mov BL, CAR1_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
 
-  mov CX, CAR2_X    ; Set initial column (X)
-  mov DX, CAR2_Y    ; Set initial row (Y)
-  lea si, img2      ;load image adress
-  mov BL, CAR2_IMG_DIR  ; Set Face Direction
+  mov CX, CAR2_X                        ; Set initial column (X)
+  mov DX, CAR2_Y                        ; Set initial row (Y)
+  lea SI, img2                          ; Load image adress
+  mov BL, CAR2_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
   ret
 DRAW_CARS endp
 ;-------------------------------------------------------
-DRAW_CAR proc near
+DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, BL: IMG_DIR
     mov AX, 320
-    cmp BL, 1
-    jng  SKIP_DX_ADDITION ; Horizontal
-    add DX, CAR_WIDTH
+    cmp BL, DOWN                           
+    jng  SKIP_DX_ADDITION               ; SKIP IF VERTICAL
+    add DX, CAR_WIDTH                   ; IF IMG_DIR > (DOWN | UP)
     SKIP_DX_ADDITION:
     mul DX
     add AX, CX
@@ -359,17 +392,17 @@ DRAW_HEIGHT:
         sub DI, 321
         SKIP_DI_ADDITION:
         ;TRANSPARENT:
-        cmp BL, 1             
+        cmp BL, DOWN             
         jz SKIP_SUBBING     ; Facing Down
-        cmp BL, 2            
+        cmp BL, RIGHT            
         jz SKIP_SUBBING     ; Facing Right
         sub SI, 2
         SKIP_SUBBING:
         loop TRANSFER
     ; Go to next Row
-    add DI, 314
-    cmp BL, 1
-    jng  NEXT_BAR   ; Horizontal
+    add DI, 320 - CAR_WIDTH
+    cmp BL, DOWN
+    jng  NEXT_BAR         ; SKIP IF VERTICAL
     inc AX
     mov DI, AX
     NEXT_BAR:
