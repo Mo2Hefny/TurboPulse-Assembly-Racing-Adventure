@@ -37,7 +37,8 @@ ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Ty
   ret
 ADD_OBSTACLE endp
 ;-------------------------------------------------------
-CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR, Returns AX = 1 if collides
+CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR
+                                        ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   mov PLAYER_DIRECTION, AL
   mov PLAYER_X, CX
   mov PLAYER_Y, DX
@@ -71,7 +72,9 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     mov CL, DH
     shl AX, 1
     cmp AX, CX
-    jg CHECK_NEXT_OBSTACLE
+    jnl CHECK_NEXT_OBSTACLE
+    sub DH, AL                          ; Stores the needed X to move
+    shr DH, 1
     ; IF (abs(y - Py) >= DL)  isn't colliding
     mov AX, [OBSTACLES_Y + BX]
     mov CX, PLAYER_Y
@@ -84,14 +87,18 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     mov CL, DL
     shl AX, 1
     cmp AX, CX
-    jg CHECK_NEXT_OBSTACLE
+    jnl CHECK_NEXT_OBSTACLE
+    sub DL, AL                          ; Stores the needed Y to move
+    shr DL, 1
+    xor AX, AX
     mov AX, 1                           ; AX = 1 since a collision has occured
     jmp EXIT_CHECK_COLLISION
     ; Loop On The Next Obstacle
     CHECK_NEXT_OBSTACLE:
     cmp BX, 0
     jnz CHECK_OBSTACLE_COLLISION
-  xor AX, AX                            ; AX = 0 since no collision has occured
+  or AX, -1                            ; AX = 0 since no collision has occured
+  mov AX, 0
   EXIT_CHECK_COLLISION:
   ret
 CHECK_COLLISION endp

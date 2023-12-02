@@ -90,8 +90,17 @@ MOVE_CARS proc far
   mov AL, CAR1_IMG_DIR
   mov CX, CAR1_X
   mov DX, CAR1_Y
-  call CHECK_COLLISION
+  call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   mov CAR1_COLLISION, AL
+  jnz SKIP_COLLISION_FIX_1
+  mov AL, CAR1_IMG_DIR
+  lea DI, CAR1_ACCELERATION
+  lea SI, CAR1_MOVEMENT_DIR
+  call FIX_COLLISION
+  lea DI, CAR1_X
+  lea SI, CAR1_Y
+  call MOVE_CAR
+  SKIP_COLLISION_FIX_1:
 
   ; Key may be associated with player two
   cmp CX, 0                             ; Key didn't belong to player one
@@ -122,6 +131,15 @@ MOVE_CARS proc far
   mov DX, CAR2_Y
   call CHECK_COLLISION
   mov CAR2_COLLISION, AL
+  jnz SKIP_COLLISION_FIX_2
+  mov AL, CAR2_IMG_DIR
+  lea DI, CAR2_ACCELERATION
+  lea SI, CAR2_MOVEMENT_DIR
+  call FIX_COLLISION
+  lea DI, CAR2_X
+  lea SI, CAR2_Y
+  call MOVE_CAR
+  SKIP_COLLISION_FIX_2:
 
   ; reset Keyboard Buffer
   mov AH, 04h
@@ -373,6 +391,31 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
   EXIT_CAR_AT_REST:
   ret
 CAR_AT_REST endp
+;-------------------------------------------------------
+FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
+  mov AH, [SI]
+  cmp AL, DOWN
+  jng FIX_VERTICAL
+  mov DL, DH
+  FIX_VERTICAL:
+  mov DH, 0
+  xor AH, 1                           ; Switch Movement Direction
+  mov [SI], AH
+  XOR AH, AL                          ; 0 if the car collided while reversing
+  ; EDIT VELOCITY
+  jz SKIP_FIX_VELOCITY
+  mov DH, -1
+  xor DL, -1
+  add DX, 1
+  SKIP_FIX_VELOCITY:
+  push AX
+  mov AX, [DI]
+  xor AX, -1                          ; Make Acceleration = - Acceleration
+  sar AX, 1
+  mov [DI], AX
+  pop AX
+  ret
+FIX_COLLISION endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
   mov CX, CAR1_X                        ; Set initial column (X)
