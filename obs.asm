@@ -1,15 +1,15 @@
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
-  ; CARS.asm
-  EXTRN CAR1_X:WORD
-  EXTRN CAR1_Y:WORD
-  EXTRN CAR2_X:WORD
-  EXTRN CAR2_Y:WORD
   PUBLIC ADD_OBSTACLE
   PUBLIC CHECK_COLLISION
   PUBLIC DRAW_OBSTACLES
 .model small
 .data
+  ; Constants
+  CAR_WIDTH EQU 06h       ; The width of all cars
+  CAR_HEIGHT EQU 0Bh      ; The height of all cars
+  DOWN EQU 1
+  ; Variables
   MAX_OBSTACLES_NUM EQU 30
   TYPE_WIDTH  DB 7
   TYPE_HEIGHT DB 7
@@ -19,6 +19,9 @@
   OBSTACLES_TYPE DW MAX_OBSTACLES_NUM dup(-1)
   OBSTACLES_X DW MAX_OBSTACLES_NUM dup(-1)                            ; OBSTACLE_Center_X
   OBSTACLES_Y DW MAX_OBSTACLES_NUM dup(-1)                            ; OBSTACLE_Center_Y
+  PLAYER_X DW ?
+  PLAYER_Y DW ?
+  PLAYER_DIRECTION DB ?
 .code
 ;-------------------------------------------------------
 ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Type
@@ -34,7 +37,62 @@ ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Ty
   ret
 ADD_OBSTACLE endp
 ;-------------------------------------------------------
-CHECK_COLLISION proc far                ; CX: CAR_CenterX, DX: CAR_CenterY, AX: MOVEMENT_DIR
+CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR, Returns AX = 1 if collides
+  mov PLAYER_DIRECTION, AL
+  mov PLAYER_X, CX
+  mov PLAYER_Y, DX
+  mov BX, OBSTACLES_COUNT
+  CHECK_OBSTACLE_COLLISION:
+    sub BX, 2
+    mov DL, 6
+    mov DH, 11
+    mov AL, PLAYER_DIRECTION
+    cmp AL, 1
+    jg SKIP_DIMENSION_SWITCH            ; IF Vertical DL = W, DH = H
+    mov CL, 8
+    rol DX, CL                          ; ELSE DL = H, DH = W
+    SKIP_DIMENSION_SWITCH:
+    push BX
+    mov BX, [OBSTACLES_TYPE + BX]
+    add DL, [TYPE_WIDTH + BX]           ; Vertical: DL = W/2 + PW/2
+                                        ; Horizontal: DL = W/2 + PH/2
+    add DH, [TYPE_HEIGHT + BX]          ; Vertical: DH = H/2 + PH/2
+                                        ; Horizontal: DH = H/2 + PW/2
+    pop BX
+    ; IF (abs(x - Px) >= DH)  isn't colliding
+    mov AX, [OBSTACLES_X + BX]
+    mov CX, PLAYER_X
+    cmp AX, CX
+    jnl ABSOLUTE_X
+    xchg AX, CX
+    ABSOLUTE_X:
+    sub AX, CX
+    mov CX, 0
+    mov CL, DH
+    shl AX, 1
+    cmp AX, CX
+    jg CHECK_NEXT_OBSTACLE
+    ; IF (abs(y - Py) >= DL)  isn't colliding
+    mov AX, [OBSTACLES_Y + BX]
+    mov CX, PLAYER_Y
+    cmp AX, CX
+    jnl ABSOLUTE_Y
+    xchg AX, CX
+    ABSOLUTE_Y:
+    sub AX, CX
+    mov CX, 0
+    mov CL, DL
+    shl AX, 1
+    cmp AX, CX
+    jg CHECK_NEXT_OBSTACLE
+    mov AX, 1                           ; AX = 1 since a collision has occured
+    jmp EXIT_CHECK_COLLISION
+    ; Loop On The Next Obstacle
+    CHECK_NEXT_OBSTACLE:
+    cmp BX, 0
+    jnz CHECK_OBSTACLE_COLLISION
+  xor AX, AX                            ; AX = 0 since no collision has occured
+  EXIT_CHECK_COLLISION:
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------

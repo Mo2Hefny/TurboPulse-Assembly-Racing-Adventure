@@ -17,8 +17,8 @@
   CAR_WIDTH EQU 06h       ; The width of all cars
   CAR_HEIGHT EQU 0Bh      ; The height of all cars
   CAR_SPEED EQU 3
-  ACCELERATION_INCREASE EQU 2
-  ACCELERATION_DECREASE EQU 1
+  ACCELERATION_INCREASE EQU 5
+  ACCELERATION_DECREASE EQU 2
   MAX_ACCELERATION EQU 18
   GAME_BORDER_X_MIN EQU 0
   GAME_BORDER_X_MAX EQU 320
@@ -45,6 +45,8 @@
   CAR2_IMG_DIR DB UP
   CAR2_MOVEMENT_DIR DB UP
   CAR2_ACCELERATION DW 0
+  CAR1_COLLISION DB 1
+  CAR2_COLLISION DB 1
 
              ; Normal Shift  CTRL   ALT
   CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
@@ -84,6 +86,12 @@ MOVE_CARS proc far
   mov AL, CAR1_IMG_DIR
   lea SI, CAR1_MOVEMENT_DIR
   call CAR_AT_REST
+  ; Check For Collision
+  mov AL, CAR1_IMG_DIR
+  mov CX, CAR1_X
+  mov DX, CAR1_Y
+  call CHECK_COLLISION
+  mov CAR1_COLLISION, AL
 
   ; Key may be associated with player two
   cmp CX, 0                             ; Key didn't belong to player one
@@ -108,6 +116,12 @@ MOVE_CARS proc far
   mov AL, CAR2_IMG_DIR
   lea SI, CAR2_MOVEMENT_DIR
   call CAR_AT_REST
+  ; Check For Collision
+  mov AL, CAR2_IMG_DIR
+  mov CX, CAR2_X
+  mov DX, CAR2_Y
+  call CHECK_COLLISION
+  mov CAR2_COLLISION, AL
 
   ; reset Keyboard Buffer
   mov AH, 04h
@@ -364,12 +378,20 @@ DRAW_CARS proc far
   mov CX, CAR1_X                        ; Set initial column (X)
   mov DX, CAR1_Y                        ; Set initial row (Y)
   lea SI, img1                          ; Load image adress
+  cmp CAR1_COLLISION, 0
+  jz  NO_COL_1
+  lea SI, img2                          ; Load image adress
+  NO_COL_1:
   mov BL, CAR1_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
 
   mov CX, CAR2_X                        ; Set initial column (X)
   mov DX, CAR2_Y                        ; Set initial row (Y)
   lea SI, img2                          ; Load image adress
+  cmp CAR2_COLLISION, 0
+  jz  NO_COL
+  lea SI, img1
+  NO_COL:
   mov BL, CAR2_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
   ret
