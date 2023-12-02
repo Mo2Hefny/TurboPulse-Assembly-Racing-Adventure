@@ -37,6 +37,8 @@ main proc far
   call RESET_BACKGROUND
   ; Draw Cars
   call MOVE_CARS
+  mov AX, 0A000h
+  mov ES, AX
   call DRAW_CARS
   
   ; Repeat the process

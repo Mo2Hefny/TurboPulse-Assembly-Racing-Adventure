@@ -2,7 +2,6 @@
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
 .model small
-.stack 64
 .data
   ; Red Car
   img1 DB 184, 113, 113, 6, 137, 209, 185, 113, 6, 6, 137, 232, 185, 113, 6, 6, 137, 234, 244, 136, 41, 41, 138, 21, 244, 136, 41, 41, 138, 21, 170, 161, 137, 137, 23, 170, 19, 3, 75, 75 
@@ -59,7 +58,6 @@
 .code
 ;-------------------------------------------------------
 MOVE_CARS proc far
-  PUSH ES
   mov AX, @data
   mov ES, AX
   mov CX, 0
@@ -112,7 +110,6 @@ MOVE_CARS proc far
   int 21h
 
   EXIT_MOVE_CARS:
-  POP ES
   mov AL, TIME_AUX
   mov OLD_TIME_AUX, AL
   ret
