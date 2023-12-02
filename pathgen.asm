@@ -34,6 +34,7 @@ random_number proc
                      div  bl
                      mov  al,ah
                      mov  ah,0
+                     add al,directon
                      mov  bl,4
                      div  bl
                      mov  al, direction
