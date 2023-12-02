@@ -123,7 +123,7 @@ READ_BUFFER proc near
   ; Check if any key is being pressed (if not exit)
   mov AH, 1
   int 16h
-  jz  BUFFER_EMPTY        ; ZF = 1 if no key is being pressed
+  jz  BUFFER_EMPTY                      ; ZF = 1 if no key is being pressed
   ; Get the pressed keys
   mov AH, 0
   int 16h
@@ -252,14 +252,14 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   XOR AX, AX
   mov AX, [DI]
   mov DL, CAR_SPEED
-  imul DL                      ; (Velocity + Boost) * Acceleration(DX)
+  imul DL                               ; (Velocity + Boost) * Acceleration(DX)
   ;mov DL, TIME_AUX
-  ;sub DL, OLD_TIME_AUX        ; delta(T) = New T - Old T
-  ;mul DL                      ; (Velocity + Boost) * Acceleration(DX) * delta(T)
-                              ; NOT WORKING XD
+  ;sub DL, OLD_TIME_AUX                 ; delta(T) = New T - Old T
+  ;mul DL                               ; (Velocity + Boost) * Acceleration(DX) * delta(T)
+                                        ; NOT WORKING XD
   mov CL, 3                            
-  SAR AX, CL                  ; To make acceleration smaller
-  mov DX, AX                  ; (Velocity + Boost) * Acceleration(DX)
+  SAR AX, CL                            ; To make acceleration smaller
+  mov DX, AX                            ; (Velocity + Boost) * Acceleration(DX)
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
@@ -374,41 +374,41 @@ DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, B
     SKIP_DX_ADDITION:
     mul DX
     add AX, CX
-    mov DI, AX            ; load adress  (CX + DX * 320)
-    mov DX, CAR_HEIGHT    ; number of rows
+    mov DI, AX                          ; load adress  (CX + DX * 320)
+    mov DX, CAR_HEIGHT                  ; number of rows
     cmp BL, DOWN             
-    jz SKIP_REVERSING     ; Facing Down
+    jz SKIP_REVERSING                   ; Facing Down
     cmp BL, RIGHT             
-    jz SKIP_REVERSING     ; Facing Right
+    jz SKIP_REVERSING                   ; Facing Right
     add SI, CAR_HEIGHT * CAR_WIDTH - 1
     SKIP_REVERSING:
 DRAW_HEIGHT:
     ; Draw Width
-    mov CX, CAR_WIDTH     ; size of Width
+    mov CX, CAR_WIDTH                   ; size of Width
     TRANSFER:
-        ;cmp SI, 0         ; Pixel is Transparent
+        ;cmp SI, 0                      ; Pixel is Transparent
         ;jz  TRANSPARENT
         MOVSB
         cmp BL, DOWN
-        jng  SKIP_DI_ADDITION   ; Horizontal
+        jng  SKIP_DI_ADDITION           ; Horizontal
         sub DI, 321
         SKIP_DI_ADDITION:
         ;TRANSPARENT:
         cmp BL, DOWN             
-        jz SKIP_SUBBING     ; Facing Down
+        jz SKIP_SUBBING                 ; Facing Down
         cmp BL, RIGHT            
-        jz SKIP_SUBBING     ; Facing Right
+        jz SKIP_SUBBING                 ; Facing Right
         sub SI, 2
         SKIP_SUBBING:
         loop TRANSFER
     ; Go to next Row
     add DI, 320 - CAR_WIDTH
     cmp BL, DOWN
-    jng  NEXT_BAR         ; SKIP IF VERTICAL
+    jng  NEXT_BAR                       ; SKIP IF VERTICAL
     inc AX
     mov DI, AX
     NEXT_BAR:
-    dec DX                ; check if end condition
+    dec DX                              ; check if end condition
     cmp DX, 0
     jnz DRAW_HEIGHT
 
