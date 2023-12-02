@@ -1,4 +1,7 @@
+  ; GAME.asm
   EXTRN TIME_AUX:BYTE
+  ; OBSTACLES.asm
+  EXTRN CHECK_COLLISION:FAR
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
 .model small
@@ -31,14 +34,14 @@
   OLD_TIME_AUX DB 0
   CURRENT_KEY DW 0000h
 
-  CAR1_X DW 0Ah           ; X position of the 1st player
-  CAR1_Y DW 5Ah           ; Y position of the 1st player
+  CAR1_X DW 0Ah                                 ; CenterX position of the 1st player
+  CAR1_Y DW 5Ah                                 ; CenterY position of the 1st player
   CAR1_IMG_DIR DB UP
   CAR1_MOVEMENT_DIR DB UP
   CAR1_ACCELERATION DW 0
 
-  CAR2_X DW 2Fh             ; X position of the 2nd player
-  CAR2_Y DW 5Ah             ; Y position of the 2nd player
+  CAR2_X DW 2Fh                                 ; CenterX position of the 2nd player
+  CAR2_Y DW 5Ah                                 ; CenterY position of the 2nd player
   CAR2_IMG_DIR DB UP
   CAR2_MOVEMENT_DIR DB UP
   CAR2_ACCELERATION DW 0
@@ -263,7 +266,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
-MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_X, [SI]: CAR_Y, DX: Velocity
+MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
   ; Move Car According To The Current Direction
   ; Horizontal Movement
   cmp AL, LEFT
@@ -295,45 +298,51 @@ MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_X, [SI]: CA
     ret
 MOVE_CAR endp
 ;-------------------------------------------------------
-MOVE_UP_PROC proc near                  ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
+MOVE_UP_PROC proc near                  ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
     sub [SI], DX
     ret
 MOVE_UP_PROC endp
 ;-------------------------------------------------------
-MOVE_DOWN_PROC proc near                ; DX: Velocity, [BX]: Direction, [SI]: Car_Y
+MOVE_DOWN_PROC proc near                ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
     add [SI], DX
     ret
 MOVE_DOWN_PROC endp
 ;-------------------------------------------------------
-MOVE_RIGHT_PROC proc near               ; DX: Velocity, [BX]: Direction, [DI]: Car_X
+MOVE_RIGHT_PROC proc near               ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
     add [DI], DX              ; DI = CAR_X
     ret
 MOVE_RIGHT_PROC endp
 ;-------------------------------------------------------
-MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: Car_X
+MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
     sub [DI], DX
     ret
 MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
-FIX_BOUNDARIES_CONDITION proc near      ; [DI]: CAR_X, [SI]: CAR_Y
-  ; X < 0
+FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY
+  mov DX, CAR_HEIGHT / 2
+  ;shr DX, 1                             ; DX = height / 2
+  ; X < 0 + height / 2
   mov AX, GAME_BORDER_X_MIN
+  add AX, DX
   cmp [DI], AX
   jl FIX_X
   ; X > X_Limit
-  mov AX, GAME_BORDER_X_MAX - 1 - CAR_HEIGHT
+  mov AX, GAME_BORDER_X_MAX - 1
+  sub AX, DX
   cmp [DI], AX
   jg FIX_X
   jmp SKIP_FIX_X
   FIX_X:
   mov [DI], AX
   SKIP_FIX_X:
-  ; Y < 0
+  ; Y < 0 + height / 2
   mov AX, GAME_BORDER_Y_MIN
+  add AX, DX
   cmp [SI], AX
   jl FIX_Y
   ; Y > Y_Limit
-  mov AX, GAME_BORDER_Y_MAX - 1 - CAR_HEIGHT
+  mov AX, GAME_BORDER_Y_MAX - 1
+  sub AX, DX
   cmp [SI], AX
   jg FIX_Y
   jmp SKIP_FIX_Y
@@ -367,11 +376,17 @@ DRAW_CARS proc far
 DRAW_CARS endp
 ;-------------------------------------------------------
 DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, BL: IMG_DIR
-    mov AX, 320
+    
     cmp BL, DOWN                           
     jng  SKIP_DX_ADDITION               ; SKIP IF VERTICAL
-    add DX, CAR_WIDTH                   ; IF IMG_DIR > (DOWN | UP)
+    sub CX, CAR_HEIGHT / 2
+    add DX, CAR_WIDTH / 2               ; IF IMG_DIR is Horizontal
+    jmp GET_CAR_DI_INDEX
     SKIP_DX_ADDITION:
+    sub CX, CAR_WIDTH / 2
+    sub DX, CAR_HEIGHT / 2
+    GET_CAR_DI_INDEX:
+    mov AX, 320
     mul DX
     add AX, CX
     mov DI, AX                          ; load adress  (CX + DX * 320)

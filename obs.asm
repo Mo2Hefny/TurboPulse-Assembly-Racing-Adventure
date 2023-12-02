@@ -1,4 +1,6 @@
+  ; GAME.asm
   EXTRN TIME_AUX:BYTE
+  ; CARS.asm
   EXTRN CAR1_X:WORD
   EXTRN CAR1_Y:WORD
   EXTRN CAR2_X:WORD
@@ -9,17 +11,17 @@
 .model small
 .data
   MAX_OBSTACLES_NUM EQU 30
-  TYPE_WIDTH  DB 5
-  TYPE_HEIGHT DB 5
-  TYPE0 DB 25 dup(25)
+  TYPE_WIDTH  DB 7
+  TYPE_HEIGHT DB 7
+  TYPE0 DB 49 dup(130)
   OLD_TIME_AUX DB 0
   OBSTACLES_COUNT DW 0
   OBSTACLES_TYPE DW MAX_OBSTACLES_NUM dup(-1)
-  OBSTACLES_X DW MAX_OBSTACLES_NUM dup(-1)
-  OBSTACLES_Y DW MAX_OBSTACLES_NUM dup(-1)
+  OBSTACLES_X DW MAX_OBSTACLES_NUM dup(-1)                            ; OBSTACLE_Center_X
+  OBSTACLES_Y DW MAX_OBSTACLES_NUM dup(-1)                            ; OBSTACLE_Center_Y
 .code
 ;-------------------------------------------------------
-ADD_OBSTACLE proc far                   ; CX: X, DX: Y, AX: Type
+ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Type
   mov BX, OBSTACLES_COUNT
   cmp BL, MAX_OBSTACLES_NUM
   jnl EXIT_ADD_OBSTACLE
@@ -32,7 +34,7 @@ ADD_OBSTACLE proc far                   ; CX: X, DX: Y, AX: Type
   ret
 ADD_OBSTACLE endp
 ;-------------------------------------------------------
-CHECK_COLLISION proc far
+CHECK_COLLISION proc far                ; CX: CAR_CenterX, DX: CAR_CenterY, AX: MOVEMENT_DIR
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
@@ -56,7 +58,16 @@ DRAW_OBSTACLES proc far
   ret
 DRAW_OBSTACLES endp
 ;-------------------------------------------------------
-DRAW_TYPE_0 proc near                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y
+DRAW_TYPE_0 proc near                   ; CX: OBSTACLE_CENTER_X, DX: OBSTACLE_CENTER_Y
+  ; Send coordinates to top left corner
+  xor AX, AX
+  mov AL, TYPE_WIDTH[0]
+  shr AL, 1
+  sub CX, AX
+  mov AL, TYPE_HEIGHT[0]
+  shr AL, 1
+  sub DX, AX
+  ; Get DI Index from CX and DX
   mov AX, 320
   mul DX
   add AX, CX
@@ -69,8 +80,8 @@ DRAW_TYPE_0 proc near                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y
   DRAW_TYPE_0_COL:
     rep MOVSB
     mov CL, TYPE_WIDTH[0]
-    add DI, 315
-    ;sub DI, CX
+    add DI, 320
+    sub DI, CX
     dec DX
     cmp DX, 0
     jnz DRAW_TYPE_0_COL
