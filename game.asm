@@ -1,3 +1,7 @@
+  ; OBSTACLES.asm
+  EXTRN ADD_OBSTACLE:FAR
+  EXTRN DRAW_OBSTACLES:FAR
+  ; CARS.asm
   EXTRN DRAW_CARS:FAR
   EXTRN MOVE_CARS:FAR
   PUBLIC TIME_AUX
@@ -26,6 +30,16 @@ main proc far
                               ; 01h Blink enabled
   int 10h
 
+  ;;;;;;; TESTING COLLISION ;;;;;;
+  mov AX, 0
+  mov CX, 05h
+  mov DX, 0Ah
+  call ADD_OBSTACLE
+  mov AX, 0
+  mov CX, 0A5h
+  mov DX, 0Ah
+  call ADD_OBSTACLE
+
   ; Get the systen time
   CHECK_TIME:
     mov AH, 2Ch
@@ -35,6 +49,8 @@ main proc far
     mov TIME_AUX, DL
   ; Else draw the new frame
   call RESET_BACKGROUND
+  ; Draw Obstacles
+  call DRAW_OBSTACLES
   ; Draw Cars
   call MOVE_CARS
   mov AX, 0A000h
