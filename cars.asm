@@ -29,6 +29,7 @@
 
   ; Variables
   OLD_TIME_AUX DB 0
+  CURRENT_KEY DW 0000h
 
   CAR1_X DW 0Ah           ; X position of the 1st player
   CAR1_Y DW 5Ah           ; Y position of the 1st player
@@ -83,7 +84,7 @@ MOVE_CARS proc far
 
   ; Key may be associated with player two
   cmp CX, 0                             ; Key didn't belong to player one
-  jz SKIP_READ
+  jz SKIP_READ                          ; CX = 0 therefore, Key doesn't belong to player one.
   call READ_BUFFER
   SKIP_READ:
 
@@ -106,8 +107,8 @@ MOVE_CARS proc far
   call CAR_AT_REST
 
   ; reset Keyboard Buffer
-  mov AH, 0Ch
-  int 21h
+  mov AH, 04h
+  int 16h
 
   EXIT_MOVE_CARS:
   mov AL, TIME_AUX
@@ -116,6 +117,9 @@ MOVE_CARS proc far
 MOVE_CARS endp
 ;-------------------------------------------------------
 READ_BUFFER proc near
+  ; Reset Current Key
+  mov AX, 0
+  mov CURRENT_KEY, AX
   ; Check if any key is being pressed (if not exit)
   mov AH, 1
   int 16h
@@ -123,11 +127,13 @@ READ_BUFFER proc near
   ; Get the pressed keys
   mov AH, 0
   int 16h
+  mov CURRENT_KEY, AX
   BUFFER_EMPTY:
     ret
 READ_BUFFER endp
 ;-------------------------------------------------------
 CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
+  mov AX, CURRENT_KEY
   MOV CX, 17                            ; Number of car input keys
   repne SCASW                           ; Search for AX in CAR_KEYS
   mov AL, [BX]
@@ -210,8 +216,8 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   jmp FIX_3
 
   DECELERATE:
-  mov AL, 0
-  cmp [DI], AL 
+  mov AX, 0
+  cmp [DI], AX 
   mov AX, ACCELERATION_DECREASE
   jl NEG_DECELERATE
   sub [DI], AX
@@ -244,7 +250,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   ; Position = Position + (Velocity + Boost) * Acceleration
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
   XOR AX, AX
-  mov AL, [DI]
+  mov AX, [DI]
   mov DL, CAR_SPEED
   imul DL                      ; (Velocity + Boost) * Acceleration(DX)
   ;mov DL, TIME_AUX
@@ -345,7 +351,6 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
   ret
 CAR_AT_REST endp
 ;-------------------------------------------------------
-;-------------------------------------------------------
 DRAW_CARS proc far
   mov CX, CAR1_X                        ; Set initial column (X)
   mov DX, CAR1_Y                        ; Set initial row (Y)
@@ -371,9 +376,9 @@ DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, B
     add AX, CX
     mov DI, AX            ; load adress  (CX + DX * 320)
     mov DX, CAR_HEIGHT    ; number of rows
-    cmp BL, 1             
+    cmp BL, DOWN             
     jz SKIP_REVERSING     ; Facing Down
-    cmp BL, 2             
+    cmp BL, RIGHT             
     jz SKIP_REVERSING     ; Facing Right
     add SI, CAR_HEIGHT * CAR_WIDTH - 1
     SKIP_REVERSING:
@@ -384,7 +389,7 @@ DRAW_HEIGHT:
         ;cmp SI, 0         ; Pixel is Transparent
         ;jz  TRANSPARENT
         MOVSB
-        cmp BL, 1
+        cmp BL, DOWN
         jng  SKIP_DI_ADDITION   ; Horizontal
         sub DI, 321
         SKIP_DI_ADDITION:
