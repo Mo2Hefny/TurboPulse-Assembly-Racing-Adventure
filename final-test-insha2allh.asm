@@ -1,25 +1,27 @@
 .model medium
 .stack 64
 .data
-    direction     db ?      ;; the randomized direction
+    direction       db ?      ;; the randomized direction
 
-    pathlength    dw 0      ;; length of the track
-    maxpathlength dw 30
+    pathlength      dw 0      ;; length of the track
+    maxpathlength   dw 40
 
-    leftboundry   dw 0      ;; track boundries
-    lowboundry    dw 180
-    rightboundry  dw 320
-    upperboundry  dw 0
+    leftboundry     dw 0      ;; track boundries
+    lowboundry      dw 180
+    rightboundry    dw 320
+    upperboundry    dw 0
 
-    xstart        dw 120    ;; starting indeces
-    ystart        dw 100
+    xstart          dw 0      ;; starting indeces
+    ystart          dw 80
 
-    currx         dw ?
-    curry         dw ?
+    currx           dw ?
+    curry           dw ?
 
-    max_rand      dw 40
-    curr_rand     dw 0
-    runtime_loop  dw 77
+    max_rand        dw 50
+    curr_rand       dw 0
+    runtime_loop    dw 377
+    FinishLineColor db 4
+    boolFinished    db 0
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -31,13 +33,11 @@ RESET_BACKGROUND proc
                       xor  AL, AL                       ; Clear entire screen
                       xor  CX, CX                       ; Upper left corner CH=row, CL=column
                       mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
-                      mov  BH, 1Eh                      ; YellowOnBlue
+                      mov  BH, 02h                      ; Green-BackGround
                       int  10h
                       ret
 RESET_BACKGROUND endp
 
-    ;;;;;;;;;;;; done
- 
 random_number proc
                       push bx                           ;1
                       push ax                           ;2
@@ -73,9 +73,15 @@ random_number endp
 
 draw_square PROC
                       push ax                           ;1
-                      mov  ax,0c08h
                       push bx                           ;2
                       push di                           ;3
+                      cmp  boolFinished,0
+                      jz   no
+                      mov  ah,0ch
+                      mov  al,FinishLineColor
+                      JMP  YES
+    no:               mov  ax,0c08h
+    YES:              
                       mov  curr_rand,0
                       inc  pathlength
                       mov  cx,currx
@@ -111,8 +117,6 @@ main proc far
     ; Initialize Video Mode
                       mov  AX, 0013h                    ; Select 320x200, 256 color graphics
                       int  10h
-
-
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
 
 
@@ -129,7 +133,8 @@ main proc far
                       mov  dx,ystart
                       mov  currx,cx
                       mov  curry,dx
-                      mov  pathlength,0
+                      call draw_square
+                      mov  pathlength,1
                       mov  curr_rand,0
     GENERATE_LOOP:    
                       mov  cx,currx
@@ -342,6 +347,8 @@ main proc far
 
 
     Terminate_Program:
+                      MOV  boolFinished,1
+                      CALL draw_square
                       HLT
 
 main endp
