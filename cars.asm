@@ -14,11 +14,11 @@
        DB 74, 221, 223, 148, 3, 3, 172, 246, 223, 150, 175, 175, 174, 151, 223, 151, 150, 150, 150, 223, 200, 223, 223, 223, 223, 200
        
   ; Constants
-  CAR_WIDTH EQU 06h       ; The width of all cars
-  CAR_HEIGHT EQU 0Bh      ; The height of all cars
+  CAR_WIDTH EQU 06h                                 ; The width of all cars
+  CAR_HEIGHT EQU 0Bh                                ; The height of all cars
   CAR_SPEED EQU 3
-  ACCELERATION_INCREASE EQU 5
-  ACCELERATION_DECREASE EQU 2
+  ACCELERATION_INCREASE EQU 3
+  ACCELERATION_DECREASE EQU 1
   MAX_ACCELERATION EQU 18
   GAME_BORDER_X_MIN EQU 0
   GAME_BORDER_X_MAX EQU 320
@@ -41,37 +41,43 @@
   CAR_MOVEMENT_DIR DB UP, UP                        ; Movement Direction of player1, player2
   CAR_ACCELERATION DW 0, 0                          ; Acceleration Value of player1, player2
 
-             ; Normal Shift  CTRL   ALT
-  CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
-            DW 5000h, 5032h, 9100h, 0A000h      ; DOWN ARROW
-            DW 4D00h, 4D36h, 7400h, 9D00h       ; RIGHT ARROW
-            DW 4B00h, 4B34h, 7300h, 9B00h       ; LEFT ARROW
-            DW 0000h    ; NONE
+          ; Release Press
+  CAR1_KEYS DB 0C8h, 48h                            ; UP : 8, 7
+            DB 0D0h, 50h                            ; DOWN : 6, 5
+            DB 0CDh, 4Dh                            ; RIGHT : 4, 3
+            DB 0CBh, 4Bh                            ; LEFT : 2, 1
+            DB 00h    ; NONE : 0
 
-             ; Normal Shift  CTRL   ALT
-  CAR2_KEYS DW 1177h, 1157h, 1117h, 1100h       ; W
-            DW 1F73h, 1F53h, 1F13h, 1F00h       ; S
-            DW 2064h, 2044h, 2004h, 2000h       ; D
-            DW 1E61h, 1E41h, 1E01h, 1E00h       ; A
-            DW 0000h    ; NONE
+  CAR1_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; UP, DOWN, RIGHT, LEFT
+
+          ; Release Press
+  CAR2_KEYS DB 91h, 11h                             ; W : 8, 7        [BX] + 0
+            DB 9Fh, 1Fh                             ; S : 6, 5        [BX] + 1
+            DB 0A0h, 20h                            ; D : 4, 3        [BX] + 2
+            DB 9Eh, 1Eh                             ; A : 2, 1        [BX] + 3
+            DB 00h    ; NONE : 0
+
+  CAR2_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; W, S, D, A
 .code
 ;-------------------------------------------------------
 MOVE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
+  ; CHECK PLAYER ONE
+  mov ax, 0
+  in AL, 60h
+  lea DI, CAR1_KEYS
+  lea BX, CAR1_KEYS_STATUS
+  call READ_BUFFER
+  lea DI, CAR2_KEYS
+  lea BX, CAR2_KEYS_STATUS
   call READ_BUFFER
 
   ; Player One
   mov AL, 0
   mov CURRENT_CAR, AL
   call UPDATE_CAR
-
-  ; Key may be associated with player two
-  cmp CX, 0                             ; Key didn't belong to player one
-  jz SKIP_READ                          ; CX = 0 therefore, Key doesn't belong to player one.
-  call READ_BUFFER
-  SKIP_READ:
 
   ; Player Two
   mov AL, 2
@@ -89,7 +95,7 @@ MOVE_CARS proc far
 MOVE_CARS endp
 ;-------------------------------------------------------
 UPDATE_CAR proc near
-  xor BX, BX
+  mov BX, 0
   mov BL, CURRENT_CAR
   call CHECK_INPUT                      ; Stores status in CX
   ; Simulate acceleration for player one
@@ -123,50 +129,56 @@ UPDATE_CAR proc near
   ret
 UPDATE_CAR endp
 ;-------------------------------------------------------
-READ_BUFFER proc near
-  ; Reset Current Key
-  mov AX, 0
-  mov CURRENT_KEY, AX
-  ; Check if any key is being pressed (if not exit)
-  mov AH, 1
-  int 16h
-  jz  BUFFER_EMPTY                      ; ZF = 1 if no key is being pressed
-  ; Get the pressed keys
-  mov AH, 0
-  int 16h
-  mov CURRENT_KEY, AX
-  BUFFER_EMPTY:
+READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
+  ; Check Selected Car Input
+  MOV CX, 9
+  repne SCASB                           ; Search for AX in CAR_KEYS
+  cmp CX, 0
+  jz EXIT_READ_KEYBOARD
+  mov DX, 8
+  sub DL, CL
+  sar Dl, 1
+  add BX, DX
+  and CL, 1
+  mov [BX], CL
+  cmp CL, 0
+  jz EXIT_READ_KEYBOARD
+  sub BX, DX
+  xor DX, 1
+  add BX, DX
+  mov [BX], CH
+  EXIT_READ_KEYBOARD:
     ret
 READ_BUFFER endp
 ;-------------------------------------------------------
 CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR, [SI]: MOVEMENT_DIR
   ; Load Car Info Depending on BX: Car_Number
-  lea DI, CAR1_KEYS
+  lea DI, CAR1_KEYS_STATUS
   cmp BX, 2
   jnz CHECK_CAR1_KEYS
-  lea DI, CAR2_KEYS
+  lea DI, CAR2_KEYS_STATUS
   CHECK_CAR1_KEYS:
   shr BX, 1
   lea SI, [CAR_MOVEMENT_DIR + BX]
   ; Check Selected Car Input
-  mov AX, CURRENT_KEY
-  MOV CX, 17                            ; Number of car input keys
-  repne SCASW                           ; Search for AX in CAR_KEYS
+  mov AX, 1
+  MOV CX, 5                          ; Number of car input keys
+  repne SCASB                        ; Search for AX in CAR_KEYS
   mov AL, [CAR_IMG_DIR + BX]
   mov AH, [SI]
   cmp CX, 0
   jz EXIT_CHECK_INPUT
   ; Horizontal Movement
   ; LEFT
-  cmp CX, 4
-  jng MOVEMENT_LEFT
+  cmp CX, 1
+  jz MOVEMENT_LEFT
   ; RIGHT
-  cmp CX, 8
-  jng MOVEMENT_RIGHT
+  cmp CX, 2
+  jz MOVEMENT_RIGHT
   ; Vertical Movement
   ; DOWN
-  cmp CX, 12
-  jng MOVEMENT_DOWN
+  cmp CX, 3
+  jz MOVEMENT_DOWN
   ; UP
   jmp MOVEMENT_UP
 
@@ -290,33 +302,30 @@ MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   ; Load Car Info Depending on BX: Car_Number
   lea DI, [CAR_X + BX]
   lea SI, [CAR_Y + BX]
-  sar BX, 1
-  mov AL, [CAR_IMG_DIR + BX]
+  mov AX, BX
+  lea BX, CAR1_KEYS_STATUS
+  cmp AX, 2
+  jnz MOVE_CAR1
+  lea BX, CAR2_KEYS_STATUS
+  MOVE_CAR1:
   ; Move Car According To The Current Direction
   ; Horizontal Movement
-  cmp AL, LEFT
-  jz MOVE_LEFT
-  cmp AL, RIGHT
-  jz MOVE_RIGHT
-  ; Vertical Movement
-  cmp AL, DOWN
-  jz MOVE_DOWN
-  jmp MOVE_UP
-  MOVE_UP:
-    call MOVE_UP_PROC
-    jmp EXIT_MOVE_CAR
-
-  MOVE_DOWN:
-    call MOVE_DOWN_PROC
-    jmp EXIT_MOVE_CAR
-
-  MOVE_RIGHT:
-    call MOVE_RIGHT_PROC
-    jmp EXIT_MOVE_CAR
-
-  MOVE_LEFT:
-    call MOVE_LEFT_PROC
-    jmp EXIT_MOVE_CAR
+  mov AX, 0
+  cmp [BX] + 0, AL
+  jz SKIP_MOVE_UP
+  call MOVE_UP_PROC
+  SKIP_MOVE_UP:
+  cmp [BX] + 1, AL
+  jz SKIP_MOVE_DOWN
+  call MOVE_DOWN_PROC
+  SKIP_MOVE_DOWN:
+  cmp [BX] + 2, AL
+  jz SKIP_MOVE_RIGHT
+  call MOVE_RIGHT_PROC
+  SKIP_MOVE_RIGHT:
+  cmp [BX] + 3, AL
+  jz EXIT_MOVE_CAR
+  call MOVE_LEFT_PROC
 
   EXIT_MOVE_CAR:
   call FIX_BOUNDARIES_CONDITION
