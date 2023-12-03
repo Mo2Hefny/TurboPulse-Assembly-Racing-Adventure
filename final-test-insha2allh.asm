@@ -1,30 +1,29 @@
 .model medium
 .stack 64
 .data
-    direction        db ?                ;; the randomized direction
+    direction        db ?                ; the randomized direction
 
-    pathlength       dw 0                ;; length of the track
-    maxpathlength    dw 30
+    pathlength       dw 0                ;Current length of the track
+    minpathlength    dw 30               ;MinPath Length Before Restarting
 
-    leftboundry      dw 0                ;; track boundries
+    leftboundry      dw 0                ; track boundries
     lowboundry       dw 180
     rightboundry     dw 320
     upperboundry     dw 0
 
-    xstart           dw 0                ;; starting indeces
+    xstart           dw 0                ; starting indeces
     ystart           dw 80
-
-    currx            dw ?
-    curry            dw ?
-
-    max_rand         dw 25
-    curr_rand        dw 0
-    runtime_loop     dw 377
-    FinishLineColor  db 4
-    boolFinished     db 0
-    TRACK            DB 57800 DUP (?)
-    Block_Percentage db 10
-    Block_SIZE       DW 6
+    currx            dw ?                ;Current pntY
+    curry            dw ?                ;Current pntX
+    max_rand         dw 25               ;Max Trials To Draw Before Restart
+    curr_rand        dw 0                ;Current Trials to Draw
+    runtime_loop     dw 377              ;Like Delay to Make sure we get random number every time
+    FinishLineColor  db 4                ;Color Of Last Sqaure
+    boolFinished     db 0                ;To color last Sqaure
+    TRACK            DB 57800 DUP (?)    ;To save and Load Track
+    Block_Percentage db 10               ;real Percentage
+    Block_SIZE       DW 6                ;size of any block(path_block,boosters)
+    Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -40,7 +39,7 @@ RESET_BACKGROUND proc
                       int  10h
                       ret
 RESET_BACKGROUND endp
-Save_Track proc
+Save_Track proc                                         ;;Function To Save Track From Screen to Array
                       mov  cx,0
                       mov  dx,0
                       mov  bx,320
@@ -64,9 +63,7 @@ Save_Track proc
                       ret
 Save_Track endp
 
-Load_Track proc
-                      
-    
+Load_Track proc                                         ;Function To Load Track From array to Screen
                       mov  cx,0
                       mov  dx,0
                       mov  bx,320
@@ -122,15 +119,15 @@ random_number proc
                       ret
 random_number endp
 
-PATH_BLOCK proc
+PATH_BLOCK proc                                         ;Draw Brown (06h) Square to Represent Path Block
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
                       mov  cx,currx
                       mov  dx,curry
                       mov  ax,0c06h
-                      add  cx,3
-                      add  dx,3
+                      add  cx,2
+                      add  dx,2
                       mov  bx,cx
                       add  bx,Block_SIZE
                       mov  di,dx
@@ -154,7 +151,57 @@ PATH_BLOCK proc
                       ret
 PATH_BLOCK endp
 
-draw_square PROC
+
+Make_Boost PROC                                         ;Draw Boost
+                      push ax                           ;1
+                      push bx                           ;2
+                      push di                           ;3
+                      mov  cx,currx
+                      mov  dx,curry
+                      CALL random_number
+                      CMP  direction, 0                 ; Blue boost  1
+                      Jz   Blue
+                      CMP  direction, 1                 ; Yellow boost E
+                      Jz   Yellow
+                      CMP  direction, 2                 ; Magenta boost D
+                      JZ   Magenta
+                      CMP  direction,3                  ; Cyan boost C
+                      JZ   Cyan
+    Blue:             mov  ax,0C01h
+                      JMP  CONT_BOOST
+    Yellow:           mov  ax,0C0Eh
+                      JMP  CONT_BOOST
+    Magenta:          mov  ax,0C0Dh
+                      JMP  CONT_BOOST
+    Cyan:             mov  ax,0C03h
+    CONT_BOOST:       
+                      add  cx,2
+                      add  dx,2
+                      mov  bx,cx
+                      add  bx,Block_SIZE
+                      mov  di,dx
+                      add  di,Block_SIZE
+    roW7:             int  10h
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column7
+                      jmp  row7
+    column7:          
+                      sub  cx,Block_SIZE
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit7
+                      jmp  row7
+    exit7:            
+                      sub  dx,Block_SIZE
+                      pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      ret
+Make_Boost ENDP
+
+
+draw_square PROC                                        ;Draw A gray Square to Represnt Our beautiful Track
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
@@ -192,6 +239,10 @@ draw_square PROC
                       ja   Dont_block
                       call PATH_BLOCK
     Dont_block:       
+                      cmp  dl,Boost_Percentage
+                      jb   Dont_Boost
+                      call Make_Boost
+    Dont_Boost:       
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1
@@ -199,7 +250,7 @@ draw_square PROC
 draw_square ENDP
 
 
-whitevertical proc
+whitevertical proc                                      ; White Strip on Our Track
                       mov  cx,currx
                       mov  dx,curry
                       push ax
@@ -231,8 +282,7 @@ whitevertical proc
 
 whitevertical endp
 
-
-whitehorizontal proc
+whitehorizontal proc                                    ; White Strip on Our Track
                       mov  cx,currx
                       mov  dx,curry
                       push ax
@@ -276,15 +326,15 @@ main proc far
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
 
 
-    restart:          
+    restart:                                            ;Restart Only if less than MinPathLength
                       push ax
-                      mov  ax,maxpathlength
+                      mov  ax,minpathlength
                       cmp  pathlength,ax
                       pop  AX
                       jb   extra1
                       jmp  far ptr Terminate_Program
     extra1:           
-                      call RESET_BACKGROUND
+                      call RESET_BACKGROUND             ;Resest Our Green BackGround
                       mov  cx,xstart
                       mov  dx,ystart
                       mov  currx,cx
@@ -505,9 +555,8 @@ main proc far
                       jmp  cont
     Terminate_Program:
                       MOV  boolFinished,1
-                      CALL draw_square
-                      call Save_Track
-                      CALL Load_Track
+                      CALL draw_square                  ;Draw Our Final RedSqaure To Represnt End Line
+                      call Save_Track                   ;Save Track in Array For Further Usage
                       HLT
 main endp
 end main
