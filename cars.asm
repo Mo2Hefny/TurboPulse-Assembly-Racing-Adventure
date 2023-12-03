@@ -16,8 +16,8 @@
   ; Constants
   CAR_WIDTH EQU 06h                                 ; The width of all cars
   CAR_HEIGHT EQU 0Bh                                ; The height of all cars
-  CAR_SPEED EQU 3
-  ACCELERATION_INCREASE EQU 3
+  CAR_SPEED EQU 2
+  ACCELERATION_INCREASE EQU 2
   ACCELERATION_DECREASE EQU 1
   MAX_ACCELERATION EQU 18
   GAME_BORDER_X_MIN EQU 0
@@ -29,6 +29,10 @@
   DOWN EQU 1
   RIGHT EQU 2
   LEFT EQU 3
+  UP_RIGHT EQU 4
+  DOWN_LEFT EQU 5
+  UP_LEFT EQU 6
+  DOWN_RIGHT EQU 7
 
   ; Variables
   OLD_TIME_AUX DB 0
@@ -160,27 +164,67 @@ CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR
   CHECK_CAR1_KEYS:
   shr BX, 1
   lea SI, [CAR_MOVEMENT_DIR + BX]
-  ; Check Selected Car Input
-  mov AX, 1
-  MOV CX, 5                          ; Number of car input keys
-  repne SCASB                        ; Search for AX in CAR_KEYS
   mov AL, [CAR_IMG_DIR + BX]
   mov AH, [SI]
-  cmp CX, 0
-  jz EXIT_CHECK_INPUT
-  ; Horizontal Movement
-  ; LEFT
-  cmp CX, 1
-  jz MOVEMENT_LEFT
-  ; RIGHT
-  cmp CX, 2
-  jz MOVEMENT_RIGHT
-  ; Vertical Movement
-  ; DOWN
-  cmp CX, 3
+  mov BX, DI
+  ; Check Selected Car Input
+  mov CX, 1
+  cmp CL, [DI]
+  jz MOVEMENT_UP
+  inc DI
+  cmp CL, [DI]
   jz MOVEMENT_DOWN
-  ; UP
-  jmp MOVEMENT_UP
+  inc DI
+  cmp CL, [DI]
+  jz MOVEMENT_RIGHT
+  inc DI
+  cmp CL, [DI]
+  jz MOVEMENT_LEFT
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_UP:
+  cmp CL, [DI] + 2     
+  jz MOVEMENT_UP_RIGHT                  ; Up and Right are Pressed
+  cmp CL, [DI] + 3                      
+  jz MOVEMENT_UP_LEFT                   ; Up and Left are Pressed
+  mov DH, UP
+  mov DL, DOWN
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_UP_RIGHT:
+  mov DH, UP_RIGHT
+  mov DL, DOWN_LEFT
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_UP_LEFT:
+  mov DH, UP_LEFT
+  mov DL, DOWN_RIGHT
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_DOWN:
+  cmp CL, [DI] + 1     
+  jz MOVEMENT_DOWN_RIGHT                ; Down and Right are Pressed
+  cmp CL, [DI] + 2                      
+  jz MOVEMENT_DOWN_LEFT                 ; Down and Left are Pressed
+  mov DH, DOWN
+  mov DL, UP
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_DOWN_RIGHT:
+  mov DH, DOWN_RIGHT
+  mov DL, UP_LEFT
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
+
+  MOVEMENT_DOWN_LEFT:
+  mov DH, DOWN_LEFT
+  mov DL, UP_RIGHT
+  call CHANGE_DIRECTION
+  jmp EXIT_CHECK_INPUT
 
   MOVEMENT_LEFT:
   mov DH, LEFT
@@ -194,17 +238,6 @@ CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR
   call CHANGE_DIRECTION
   jmp EXIT_CHECK_INPUT
 
-  MOVEMENT_DOWN:
-  mov DH, DOWN
-  mov DL, UP
-  call CHANGE_DIRECTION
-  jmp EXIT_CHECK_INPUT
-
-  MOVEMENT_UP:
-  mov DH, UP
-  mov DL, DOWN
-  call CHANGE_DIRECTION
-
   EXIT_CHECK_INPUT:
   mov [SI], AH
   xor BX, BX
@@ -213,7 +246,7 @@ CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR
   lea SI, [CAR_IMG_DIR + BX]
   mov [SI], AL
   ret
-CHECK_INPUT endp
+CHECK_INPUT endp;-------------------------------------------------------
 ;-------------------------------------------------------
 CHANGE_DIRECTION proc near              ; AH: MOVEMENT_DIR, AL: IMG_DIR, DH: NEW_DIR, DL: Opposite_DIR, AH: 0 if normal
   cmp AH, AL                            ; (CURR_IMG != CURR_MOVEMENT)
