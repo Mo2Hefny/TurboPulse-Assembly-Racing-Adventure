@@ -1,27 +1,28 @@
 .model medium
 .stack 64
 .data
-    direction       db ?      ;; the randomized direction
+    direction       db ?                ;; the randomized direction
 
-    pathlength      dw 0      ;; length of the track
-    maxpathlength   dw 40
+    pathlength      dw 0                ;; length of the track
+    maxpathlength   dw 30
 
-    leftboundry     dw 0      ;; track boundries
+    leftboundry     dw 0                ;; track boundries
     lowboundry      dw 180
     rightboundry    dw 320
     upperboundry    dw 0
 
-    xstart          dw 0      ;; starting indeces
+    xstart          dw 0                ;; starting indeces
     ystart          dw 80
 
     currx           dw ?
     curry           dw ?
 
-    max_rand        dw 50
+    max_rand        dw 25
     curr_rand       dw 0
     runtime_loop    dw 377
     FinishLineColor db 4
     boolFinished    db 0
+    TRACK           DB 57800 DUP (?)
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -37,6 +38,55 @@ RESET_BACKGROUND proc
                       int  10h
                       ret
 RESET_BACKGROUND endp
+Save_Track proc
+                      mov  cx,0
+                      mov  dx,0
+                      mov  bx,320
+                      MOV  di,180
+                      mov  ah,0dh
+                      lea  si,TRACK
+    row8:             int  10h
+                      mov  [si],al
+                      inc  si
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column8
+                      jmp  row8
+    column8:          
+                      sub  cx,320
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit8
+                      jmp  row8
+    exit8:            
+                      ret
+Save_Track endp
+
+Load_Track proc
+                      
+    
+                      mov  cx,0
+                      mov  dx,0
+                      mov  bx,320
+                      MOV  di,180
+                      mov  ah,0ch
+                      mov  si,offset TRACK
+    row9:             mov  AL,[SI]
+                      int  10h
+                      inc  si
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column9
+                      jmp  row9
+    column9:          
+                      sub  cx,320
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit9
+                      jmp  row9
+    exit9:            
+                      ret
+Load_Track endp
 
 random_number proc
                       push bx                           ;1
@@ -349,7 +399,8 @@ main proc far
     Terminate_Program:
                       MOV  boolFinished,1
                       CALL draw_square
+                      call Save_Track
+                      CALL Load_Track
                       HLT
-
 main endp
 end main
