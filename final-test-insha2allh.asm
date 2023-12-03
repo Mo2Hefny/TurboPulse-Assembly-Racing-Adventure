@@ -1,28 +1,30 @@
 .model medium
 .stack 64
 .data
-    direction       db ?                ;; the randomized direction
+    direction        db ?                ;; the randomized direction
 
-    pathlength      dw 0                ;; length of the track
-    maxpathlength   dw 30
+    pathlength       dw 0                ;; length of the track
+    maxpathlength    dw 30
 
-    leftboundry     dw 0                ;; track boundries
-    lowboundry      dw 180
-    rightboundry    dw 320
-    upperboundry    dw 0
+    leftboundry      dw 0                ;; track boundries
+    lowboundry       dw 180
+    rightboundry     dw 320
+    upperboundry     dw 0
 
-    xstart          dw 0                ;; starting indeces
-    ystart          dw 80
+    xstart           dw 0                ;; starting indeces
+    ystart           dw 80
 
-    currx           dw ?
-    curry           dw ?
+    currx            dw ?
+    curry            dw ?
 
-    max_rand        dw 25
-    curr_rand       dw 0
-    runtime_loop    dw 377
-    FinishLineColor db 4
-    boolFinished    db 0
-    TRACK           DB 57800 DUP (?)
+    max_rand         dw 25
+    curr_rand        dw 0
+    runtime_loop     dw 377
+    FinishLineColor  db 4
+    boolFinished     db 0
+    TRACK            DB 57800 DUP (?)
+    Block_Percentage db 10
+    Block_SIZE       DW 6
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -87,7 +89,6 @@ Load_Track proc
     exit9:            
                       ret
 Load_Track endp
-
 random_number proc
                       push bx                           ;1
                       push ax                           ;2
@@ -121,6 +122,38 @@ random_number proc
                       ret
 random_number endp
 
+PATH_BLOCK proc
+                      push ax                           ;1
+                      push bx                           ;2
+                      push di                           ;3
+                      mov  cx,currx
+                      mov  dx,curry
+                      mov  ax,0c06h
+                      add  cx,3
+                      add  dx,3
+                      mov  bx,cx
+                      add  bx,Block_SIZE
+                      mov  di,dx
+                      add  di,Block_SIZE
+    row1:             int  10h
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column1
+                      jmp  row1
+    column1:          
+                      sub  cx,Block_SIZE
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit1
+                      jmp  row1
+    exit1:            
+                      sub  dx,Block_SIZE
+                      pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      ret
+PATH_BLOCK endp
+
 draw_square PROC
                       push ax                           ;1
                       push bx                           ;2
@@ -153,11 +186,84 @@ draw_square PROC
                       jmp  row
     exit:             
                       sub  dx,20
+                      mov  ah, 2ch
+                      int  21h
+                      cmp  dl,Block_Percentage
+                      ja   Dont_block
+                      call PATH_BLOCK
+    Dont_block:       
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1
                       ret
 draw_square ENDP
+
+
+whitevertical proc
+                      mov  cx,currx
+                      mov  dx,curry
+                      push ax
+                      push bx
+                      push di
+                      mov  ax,0c0fh
+                      add  cx,9
+                      add  dx,8
+                      mov  bx,cx
+                      mov  di,dx
+                      add  bx,1
+                      add  di,4
+    row2:             int  10h
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column2
+                      jmp  row2
+    column2:          
+                      sub  cx,1
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit3
+                      jmp  row2
+
+    exit3:            pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      ret
+
+whitevertical endp
+
+
+whitehorizontal proc
+                      mov  cx,currx
+                      mov  dx,curry
+                      push ax
+                      push bx
+                      push di
+                      mov  ax,0c0fh
+                      add  cx,6
+                      add  dx,10
+                      mov  bx,cx
+                      mov  di,dx
+                      add  bx,4
+                      add  di,1
+    row12:            int  10h
+                      inc  cx
+                      cmp  cx,bx
+                      jz   column12
+                      jmp  row12
+    column12:         
+                      sub  cx,4
+                      inc  dx
+                      cmp  dx,di
+                      jz   exit12
+                      jmp  row12
+
+    exit12:           pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      ret
+
+whitehorizontal endp
+
 
 main proc far
 
@@ -252,6 +358,7 @@ main proc far
                       jmp  far ptr GENERATE_LOOP
     skipup3:          sub  curry,20
                       call draw_square
+                      call whitevertical
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     MOVE_DOWN:        
@@ -303,8 +410,8 @@ main proc far
     skipdown3:        
                       add  curry,20
                       call draw_square
+                      call whitevertical
                       jmp  cont
- 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     MOVE_LEFT:        
@@ -350,6 +457,7 @@ main proc far
     skipleft4:        
                       sub  currx,20
                       call draw_square
+                      call whitehorizontal
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     MOVE_RIGHT:       
@@ -393,9 +501,8 @@ main proc far
     skipright4:       
                       add  currx,20
                       call draw_square
+                      call whitehorizontal
                       jmp  cont
-
-
     Terminate_Program:
                       MOV  boolFinished,1
                       CALL draw_square
