@@ -33,20 +33,13 @@
   ; Variables
   OLD_TIME_AUX DB 0
   CURRENT_KEY DW 0000h
+  CURRENT_CAR DB ?
 
-  CAR1_X DW 0Ah                                 ; CenterX position of the 1st player
-  CAR1_Y DW 5Ah                                 ; CenterY position of the 1st player
-  CAR1_IMG_DIR DB UP
-  CAR1_MOVEMENT_DIR DB UP
-  CAR1_ACCELERATION DW 0
-
-  CAR2_X DW 2Fh                                 ; CenterX position of the 2nd player
-  CAR2_Y DW 5Ah                                 ; CenterY position of the 2nd player
-  CAR2_IMG_DIR DB UP
-  CAR2_MOVEMENT_DIR DB UP
-  CAR2_ACCELERATION DW 0
-  CAR1_COLLISION DB 1
-  CAR2_COLLISION DB 1
+  CAR_X DW 0Ah, 2Fh                                 ; CenterX position of player1, player2
+  CAR_Y DW 5Ah, 5Ah                                 ; CenterY position of player1, player2
+  CAR_IMG_DIR DB UP, UP                             ; IMG Direction of player1, player2
+  CAR_MOVEMENT_DIR DB UP, UP                        ; Movement Direction of player1, player2
+  CAR_ACCELERATION DW 0, 0                          ; Acceleration Value of player1, player2
 
              ; Normal Shift  CTRL   ALT
   CAR1_KEYS DW 4800h, 4838h, 8D00h, 9800h       ; UP ARROW
@@ -70,37 +63,9 @@ MOVE_CARS proc far
   call READ_BUFFER
 
   ; Player One
-  lea DI, CAR1_KEYS
-  lea BX, CAR1_IMG_DIR
-  lea SI, CAR1_MOVEMENT_DIR
-  call CHECK_INPUT                      ; Stores status in CX
-  ; Simulate acceleration for player one
-  lea DI, CAR1_ACCELERATION
-  call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
-  ; Move PLayer One
-  mov AL, CAR1_IMG_DIR
-  lea DI, CAR1_X
-  lea SI, CAR1_Y
-  call MOVE_CAR
-  ; RESET DIRECTION IF CAR IS AT REST
-  mov AL, CAR1_IMG_DIR
-  lea SI, CAR1_MOVEMENT_DIR
-  call CAR_AT_REST
-  ; Check For Collision
-  mov AL, CAR1_IMG_DIR
-  mov CX, CAR1_X
-  mov DX, CAR1_Y
-  call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
-  mov CAR1_COLLISION, AL
-  jnz SKIP_COLLISION_FIX_1
-  mov AL, CAR1_IMG_DIR
-  lea DI, CAR1_ACCELERATION
-  lea SI, CAR1_MOVEMENT_DIR
-  call FIX_COLLISION
-  lea DI, CAR1_X
-  lea SI, CAR1_Y
-  call MOVE_CAR
-  SKIP_COLLISION_FIX_1:
+  mov AL, 0
+  mov CURRENT_CAR, AL
+  call UPDATE_CAR
 
   ; Key may be associated with player two
   cmp CX, 0                             ; Key didn't belong to player one
@@ -109,37 +74,9 @@ MOVE_CARS proc far
   SKIP_READ:
 
   ; Player Two
-  lea DI, CAR2_KEYS
-  lea BX, CAR2_IMG_DIR
-  lea SI, CAR2_MOVEMENT_DIR
-  call CHECK_INPUT                      ; Stores status in CX
-  ; Simulate acceleration for player two
-  lea DI, CAR2_ACCELERATION
-  call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
-  ; Move PLayer Two
-  mov AL, CAR2_IMG_DIR
-  lea DI, CAR2_X
-  lea SI, CAR2_Y
-  call MOVE_CAR
-  ; RESET DIRECTION IF CAR IS AT REST
-  mov AL, CAR2_IMG_DIR
-  lea SI, CAR2_MOVEMENT_DIR
-  call CAR_AT_REST
-  ; Check For Collision
-  mov AL, CAR2_IMG_DIR
-  mov CX, CAR2_X
-  mov DX, CAR2_Y
-  call CHECK_COLLISION
-  mov CAR2_COLLISION, AL
-  jnz SKIP_COLLISION_FIX_2
-  mov AL, CAR2_IMG_DIR
-  lea DI, CAR2_ACCELERATION
-  lea SI, CAR2_MOVEMENT_DIR
-  call FIX_COLLISION
-  lea DI, CAR2_X
-  lea SI, CAR2_Y
-  call MOVE_CAR
-  SKIP_COLLISION_FIX_2:
+  mov AL, 2
+  mov CURRENT_CAR, AL
+  call UPDATE_CAR
 
   ; reset Keyboard Buffer
   mov AH, 04h
@@ -150,6 +87,41 @@ MOVE_CARS proc far
   mov OLD_TIME_AUX, AL
   ret
 MOVE_CARS endp
+;-------------------------------------------------------
+UPDATE_CAR proc near
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call CHECK_INPUT                      ; Stores status in CX
+  ; Simulate acceleration for player one
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
+  ; Move PLayer One
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call MOVE_CAR
+  ; RESET DIRECTION IF CAR IS AT REST
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call CAR_AT_REST
+  ; Check For Collision
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  shr BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
+  call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+  jnz SKIP_COLLISION_FIX
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call FIX_COLLISION
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  call MOVE_CAR
+  SKIP_COLLISION_FIX:
+  ret
+UPDATE_CAR endp
 ;-------------------------------------------------------
 READ_BUFFER proc near
   ; Reset Current Key
@@ -167,11 +139,20 @@ READ_BUFFER proc near
     ret
 READ_BUFFER endp
 ;-------------------------------------------------------
-CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
+CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR, [SI]: MOVEMENT_DIR
+  ; Load Car Info Depending on BX: Car_Number
+  lea DI, CAR1_KEYS
+  cmp BX, 2
+  jnz CHECK_CAR1_KEYS
+  lea DI, CAR2_KEYS
+  CHECK_CAR1_KEYS:
+  shr BX, 1
+  lea SI, [CAR_MOVEMENT_DIR + BX]
+  ; Check Selected Car Input
   mov AX, CURRENT_KEY
   MOV CX, 17                            ; Number of car input keys
   repne SCASW                           ; Search for AX in CAR_KEYS
-  mov AL, [BX]
+  mov AL, [CAR_IMG_DIR + BX]
   mov AH, [SI]
   cmp CX, 0
   jz EXIT_CHECK_INPUT
@@ -213,8 +194,12 @@ CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: IMG_DIR
   call CHANGE_DIRECTION
 
   EXIT_CHECK_INPUT:
-  mov [BX], AL
   mov [SI], AH
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  shr BX, 1
+  lea SI, [CAR_IMG_DIR + BX]
+  mov [SI], AL
   ret
 CHECK_INPUT endp
 ;-------------------------------------------------------
@@ -236,11 +221,14 @@ CHANGE_DIRECTION proc near              ; AH: MOVEMENT_DIR, AL: IMG_DIR, DH: NEW
   ret
 CHANGE_DIRECTION endp
 ;-------------------------------------------------------
-HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR, [SI]: MOVEMENT_DIR
+HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
+  ; Load Car Info Depending on BX: Car_Number
+  lea DI, [CAR_ACCELERATION + BX]
+  shr BX, 1
   cmp CX, 0
   jz DECELERATE
-  mov AL, [BX]
-  mov AH, [SI]
+  mov AL, [SI]
+  mov AH, [CAR_MOVEMENT_DIR + BX]
   XOR AL, AH                            
   mov AX, ACCELERATION_INCREASE
   jnz NEG_ACCELERATION                  ; Car is reversing
@@ -286,8 +274,8 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
   XOR AX, AX
   mov AX, [DI]
-  mov DL, CAR_SPEED
-  imul DL                               ; (Velocity + Boost) * Acceleration(DX)
+  mov BL, CAR_SPEED
+  imul BL                               ; (Velocity + Boost) * Acceleration(DX)
   ;mov DL, TIME_AUX
   ;sub DL, OLD_TIME_AUX                 ; delta(T) = New T - Old T
   ;mul DL                               ; (Velocity + Boost) * Acceleration(DX) * delta(T)
@@ -299,6 +287,11 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [BX]: IMG_DIR,
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
 MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
+  ; Load Car Info Depending on BX: Car_Number
+  lea DI, [CAR_X + BX]
+  lea SI, [CAR_Y + BX]
+  sar BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
   ; Move Car According To The Current Direction
   ; Horizontal Movement
   cmp AL, LEFT
@@ -351,16 +344,16 @@ MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: C
 MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
 FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY
-  mov DX, CAR_HEIGHT / 2
+  mov BX, CAR_HEIGHT / 2
   ;shr DX, 1                             ; DX = height / 2
   ; X < 0 + height / 2
   mov AX, GAME_BORDER_X_MIN
-  add AX, DX
+  add AX, BX
   cmp [DI], AX
   jl FIX_X
   ; X > X_Limit
   mov AX, GAME_BORDER_X_MAX - 1
-  sub AX, DX
+  sub AX, BX
   cmp [DI], AX
   jg FIX_X
   jmp SKIP_FIX_X
@@ -369,12 +362,12 @@ FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   SKIP_FIX_X:
   ; Y < 0 + height / 2
   mov AX, GAME_BORDER_Y_MIN
-  add AX, DX
+  add AX, BX
   cmp [SI], AX
   jl FIX_Y
   ; Y > Y_Limit
   mov AX, GAME_BORDER_Y_MAX - 1
-  sub AX, DX
+  sub AX, BX
   cmp [SI], AX
   jg FIX_Y
   jmp SKIP_FIX_Y
@@ -385,6 +378,9 @@ FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
 FIX_BOUNDARIES_CONDITION endp
 ;-------------------------------------------------------
 CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
+  shr BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
+  lea SI, [CAR_MOVEMENT_DIR + BX]
   cmp DX, 0
   jnz EXIT_CAR_AT_REST
     mov [SI], AL
@@ -393,6 +389,10 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
 CAR_AT_REST endp
 ;-------------------------------------------------------
 FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
+  lea DI, [CAR_ACCELERATION + BX]
+  shr BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
+  lea SI, [CAR_MOVEMENT_DIR + BX]
   mov AH, [SI]
   cmp AL, DOWN
   jng FIX_VERTICAL
@@ -418,24 +418,16 @@ FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATIO
 FIX_COLLISION endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
-  mov CX, CAR1_X                        ; Set initial column (X)
-  mov DX, CAR1_Y                        ; Set initial row (Y)
+  mov CX, CAR_X                        ; Set initial column (X)
+  mov DX, CAR_Y                        ; Set initial row (Y)
   lea SI, img1                          ; Load image adress
-  cmp CAR1_COLLISION, 0
-  jz  NO_COL_1
-  lea SI, img2                          ; Load image adress
-  NO_COL_1:
-  mov BL, CAR1_IMG_DIR                  ; Set Face Direction
+  mov BL, CAR_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
 
-  mov CX, CAR2_X                        ; Set initial column (X)
-  mov DX, CAR2_Y                        ; Set initial row (Y)
+  mov CX, CAR_X + 2                        ; Set initial column (X)
+  mov DX, CAR_Y + 2                        ; Set initial row (Y)
   lea SI, img2                          ; Load image adress
-  cmp CAR2_COLLISION, 0
-  jz  NO_COL
-  lea SI, img1
-  NO_COL:
-  mov BL, CAR2_IMG_DIR                  ; Set Face Direction
+  mov BL, CAR_IMG_DIR + 1                  ; Set Face Direction
   call DRAW_CAR
   ret
 DRAW_CARS endp
