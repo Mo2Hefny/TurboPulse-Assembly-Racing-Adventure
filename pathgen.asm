@@ -1,4 +1,7 @@
     PUBLIC GENERATE_TRACK
+    PUBLIC Load_Track
+    PUBLIC xstart
+    PUBLIC ystart
 .model medium
 .stack 64
 .data
@@ -503,6 +506,7 @@ GENERATE_TRACK proc far
                       call DECORATE_TRACK
                       ;CALL draw_square                  ;Draw Our Final RedSqaure To Represnt End Line
                       call Save_Track                   ;Save Track in Array For Further Usage
+                      mov al, DIRECTIONS
                       ;HLT
                       ret
 GENERATE_TRACK endp

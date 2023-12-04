@@ -1,9 +1,15 @@
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
+  ; PATHGEN.asm
+  EXTRN xstart:WORD
+  EXTRN ystart:WORD
   ; OBSTACLES.asm
   EXTRN CHECK_COLLISION:FAR
+  PUBLIC LOAD_CARS
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
+  PUBLIC CAR_X
+  PUBLIC CAR_Y
 .model small
 .data
   ; Red Car
@@ -17,9 +23,9 @@
   CAR_WIDTH EQU 06h                                 ; The width of all cars
   CAR_HEIGHT EQU 0Bh                                ; The height of all cars
   CAR_SPEED EQU 2
-  ACCELERATION_INCREASE EQU 2
+  ACCELERATION_INCREASE EQU 1
   ACCELERATION_DECREASE EQU 1
-  MAX_ACCELERATION EQU 16
+  MAX_ACCELERATION EQU 8
   GAME_BORDER_X_MIN EQU 0
   GAME_BORDER_X_MAX EQU 320
   ;GAME_BORDER_Y EQU 00A0h
@@ -39,8 +45,8 @@
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
 
-  CAR_X DW 0Ah, 2Fh                                 ; CenterX position of player1, player2
-  CAR_Y DW 5Ah, 5Ah                                 ; CenterY position of player1, player2
+  CAR_X DW ?, ?                                   ; CenterX position of player1, player2
+  CAR_Y DW ?, ?                                   ; CenterY position of player1, player2
   CAR_IMG_DIR DB UP, UP                 ; IMG Direction of player1, player2
   CAR_MOVEMENT_DIR DB DOWN, DOWN        ; Movement Direction of player1, player2
   CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
@@ -567,10 +573,6 @@ DRAW_HEIGHT:
         jz SKIP_SUBBING                 ; Facing Down
         cmp BL, RIGHT            
         jz SKIP_SUBBING                 ; Facing Right
-        cmp BL, DOWN_RIGHT            
-        jz SKIP_SUBBING                 ; Facing Down
-        cmp BL, DOWN_LEFT            
-        jz SKIP_SUBBING                 ; Facing Right
         sub SI, 2                       ; IF Facing Up or Left decrement SI for IMG reversing
         SKIP_SUBBING:
         loop TRANSFER
@@ -598,5 +600,55 @@ DRAW_HEIGHT:
 
     ret
 DRAW_CAR endp
+;-------------------------------------------------------;
+LOAD_CARS proc far                      ; AL: Start Direction
+  mov BX, xstart
+  add BX, 5
+  mov [CAR_X], BX
+  add BX, 9
+  mov [CAR_X + 2], BX
+  cmp AL, 0
+  jnz LOAD_CARS_DOWN
+  mov [CAR_IMG_DIR], UP
+  mov [CAR_IMG_DIR + 1], UP
+  mov BX, ystart
+  add BX, 13
+  mov [CAR_Y], BX
+  mov [CAR_Y + 2], BX
+  ret
+  LOAD_CARS_DOWN:
+  cmp AL, 1
+  jnz LOAD_CARS_LEFT
+  mov [CAR_IMG_DIR], DOWN
+  mov [CAR_IMG_DIR + 1], DOWN
+  mov BX, ystart
+  add BX, 7
+  mov [CAR_Y], BX
+  mov [CAR_Y + 2], BX
+  ret
+  LOAD_CARS_LEFT:
+  mov BX, ystart
+  add BX, 5
+  mov [CAR_Y], BX
+  add BX, 9
+  mov [CAR_Y + 2], BX
+  cmp AL, 2
+  jnz LOAD_CARS_RIGHT
+  mov [CAR_IMG_DIR], LEFT
+  mov [CAR_IMG_DIR + 1], LEFT
+  mov BX, xstart
+  add BX, 13
+  mov [CAR_x], BX
+  mov [CAR_x + 2], BX
+  ret
+  LOAD_CARS_RIGHT:
+  mov [CAR_IMG_DIR], RIGHT
+  mov [CAR_IMG_DIR + 1], RIGHT
+  mov BX, xstart
+  add BX, 7
+  mov [CAR_x], BX
+  mov [CAR_x + 2], BX
+  ret
+LOAD_CARS endp
 ;-------------------------------------------------------;
 end

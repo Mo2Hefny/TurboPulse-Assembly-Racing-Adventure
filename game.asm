@@ -1,9 +1,13 @@
+  ; PATHGEN.asm
+  EXTRN GENERATE_TRACK:FAR
+  EXTRN Load_Track:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
   EXTRN DRAW_OBSTACLES:FAR
   ; CARS.asm
   EXTRN DRAW_CARS:FAR
   EXTRN MOVE_CARS:FAR
+  EXTRN LOAD_CARS:FAR
   PUBLIC TIME_AUX
 .model small
 .stack 64
@@ -29,7 +33,9 @@ main proc far
   mov BX, 0000h                         ; 00h Background intensity enabled
                                         ; 01h Blink enabled
   int 10h
-
+  ; Generate Track
+  call GENERATE_TRACK                   ; Return Starting Direction in AL
+  call LOAD_CARS
   ;;;;;;; TESTING COLLISION ;;;;;;
   mov AX, 0
   mov CX, 0Ah
@@ -48,7 +54,7 @@ main proc far
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
   ; Else draw the new frame
-  call RESET_BACKGROUND
+  ;call Load_Track
   ; Draw Obstacles
   call DRAW_OBSTACLES
   ; Draw Cars
@@ -61,7 +67,7 @@ main proc far
   jmp CHECK_TIME
 
   ; Terminate Program
-  mov ah, 9
+  mov ah, 4Ch
   int 21h
 
 main endp
