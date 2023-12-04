@@ -48,8 +48,10 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     mov DL, 6
     mov DH, 11
     mov AL, PLAYER_DIRECTION
-    cmp AL, 1
-    jg SKIP_DIMENSION_SWITCH            ; IF Vertical DL = W, DH = H
+    cmp AL, 3
+    jnz SKIP_DIMENSION_SWITCH           ; IF Vertical DL = W, DH = H
+    cmp AL, 2
+    jnz SKIP_DIMENSION_SWITCH           ; IF Vertical DL = W, DH = H
     mov CL, 8
     rol DX, CL                          ; ELSE DL = H, DH = W
     SKIP_DIMENSION_SWITCH:
@@ -90,15 +92,13 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     jnl CHECK_NEXT_OBSTACLE
     sub DL, AL                          ; Stores the needed Y to move
     shr DL, 1
-    xor AX, AX
-    mov AX, 1                           ; AX = 1 since a collision has occured
+    xor AX, AX                          ; ZF = 1 since a collision has occured
     jmp EXIT_CHECK_COLLISION
     ; Loop On The Next Obstacle
     CHECK_NEXT_OBSTACLE:
     cmp BX, 0
     jnz CHECK_OBSTACLE_COLLISION
-  or AX, -1                            ; AX = 0 since no collision has occured
-  mov AX, 0
+  or AX, -1                            ; ZF = 0 since no collision has occured
   EXIT_CHECK_COLLISION:
   ret
 CHECK_COLLISION endp

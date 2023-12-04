@@ -19,7 +19,7 @@
   CAR_SPEED EQU 2
   ACCELERATION_INCREASE EQU 2
   ACCELERATION_DECREASE EQU 1
-  MAX_ACCELERATION EQU 18
+  MAX_ACCELERATION EQU 16
   GAME_BORDER_X_MIN EQU 0
   GAME_BORDER_X_MAX EQU 320
   ;GAME_BORDER_Y EQU 00A0h
@@ -41,9 +41,9 @@
 
   CAR_X DW 0Ah, 2Fh                                 ; CenterX position of player1, player2
   CAR_Y DW 5Ah, 5Ah                                 ; CenterY position of player1, player2
-  CAR_IMG_DIR DB UP, UP                             ; IMG Direction of player1, player2
-  CAR_MOVEMENT_DIR DB UP, UP                        ; Movement Direction of player1, player2
-  CAR_ACCELERATION DW 0, 0                          ; Acceleration Value of player1, player2
+  CAR_IMG_DIR DB UP, UP                 ; IMG Direction of player1, player2
+  CAR_MOVEMENT_DIR DB DOWN, DOWN        ; Movement Direction of player1, player2
+  CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
 
           ; Release Press
   CAR1_KEYS DB 0C8h, 48h                            ; UP : 8, 7
@@ -101,7 +101,7 @@ MOVE_CARS endp
 UPDATE_CAR proc near
   mov BX, 0
   mov BL, CURRENT_CAR
-  call CHECK_INPUT                      ; Stores status in CX
+  call CHECK_INPUT
   ; Simulate acceleration for player one
   xor BX, BX
   mov BL, CURRENT_CAR
@@ -180,6 +180,7 @@ CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR
   inc DI
   cmp CL, [DI]
   jz MOVEMENT_LEFT
+  mov CX, 0
   jmp EXIT_CHECK_INPUT
 
   MOVEMENT_UP:
@@ -274,7 +275,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   jz DECELERATE
   mov AL, [SI]
   mov AH, [CAR_MOVEMENT_DIR + BX]
-  XOR AL, AH                            
+  XOR AL, AH                            ; if AL = AH, ZF = 1
   mov AX, ACCELERATION_INCREASE
   jnz NEG_ACCELERATION                  ; Car is reversing
   add [DI], AX
@@ -317,7 +318,6 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   SKIP_ACC_CHECKS:
   ; Position = Position + (Velocity + Boost) * Acceleration
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
-  XOR AX, AX
   mov AX, [DI]
   mov BL, CAR_SPEED
   imul BL                               ; (Velocity + Boost) * Acceleration(DX)
@@ -335,32 +335,64 @@ MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   ; Load Car Info Depending on BX: Car_Number
   lea DI, [CAR_X + BX]
   lea SI, [CAR_Y + BX]
-  mov AX, BX
-  lea BX, CAR1_KEYS_STATUS
-  cmp AX, 2
-  jnz MOVE_CAR1
-  lea BX, CAR2_KEYS_STATUS
-  MOVE_CAR1:
+  sar BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
   ; Move Car According To The Current Direction
   ; Horizontal Movement
-  mov AX, 0
-  cmp [BX] + 0, AL
-  jz SKIP_MOVE_UP
+  cmp AL, 0
+  jnz SKIP_MOVE_UP
   call MOVE_UP_PROC
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_UP:
-  cmp [BX] + 1, AL
-  jz SKIP_MOVE_DOWN
+  cmp AL, 1
+  jnz SKIP_MOVE_DOWN
   call MOVE_DOWN_PROC
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_DOWN:
-  cmp [BX] + 2, AL
-  jz SKIP_MOVE_RIGHT
+  cmp AL, 2
+  jnz SKIP_MOVE_RIGHT
   call MOVE_RIGHT_PROC
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_RIGHT:
-  cmp [BX] + 3, AL
-  jz EXIT_MOVE_CAR
+  cmp AL, 3
+  jnz SKIP_MOVE_LEFT
   call MOVE_LEFT_PROC
+  jmp EXIT_MOVE_CAR
+  SKIP_MOVE_LEFT:
+  mov BH, AL
+  mov AX, DX
+  mov BL, 3
+  idiv BL
+  CBW
+  sub DX, AX
+  mov AL, BH
+  cmp AL, 4
+  jnz SKIP_MOVE_UP_RIGHT
+  call MOVE_UP_PROC
+  call MOVE_RIGHT_PROC
+  jmp EXIT_MOVE_CAR
+  SKIP_MOVE_UP_RIGHT:
+  cmp AL, 5
+  jnz SKIP_MOVE_DOWN_LEFT
+  call MOVE_DOWN_PROC
+  call MOVE_LEFT_PROC
+  jmp EXIT_MOVE_CAR
+  SKIP_MOVE_DOWN_LEFT:
+  cmp AL, 6
+  jnz SKIP_MOVE_UP_LEFT
+  call MOVE_UP_PROC
+  call MOVE_LEFT_PROC
+  jmp EXIT_MOVE_CAR
+  SKIP_MOVE_UP_LEFT:
+  cmp AL, 7
+  jnz SKIP_MOVE_DOWN_RIGHT
+  call MOVE_DOWN_PROC
+  call MOVE_RIGHT_PROC
+  SKIP_MOVE_DOWN_RIGHT:
 
   EXIT_MOVE_CAR:
+  mov BX, 0
+  mov BL, CURRENT_CAR
   call FIX_BOUNDARIES_CONDITION
     ret
 MOVE_CAR endp
@@ -476,14 +508,26 @@ DRAW_CARS endp
 ;-------------------------------------------------------
 DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, BL: IMG_DIR
     
-    cmp BL, DOWN                           
-    jng  SKIP_DX_ADDITION               ; SKIP IF VERTICAL
+    cmp BL, RIGHT                           
+    jl  SKIP_DX_ADDITION                ; SKIP IF VERTICAL
+    cmp BL, LEFT                           
+    jg  SKIP_DX_ADDITION                ; SKIP IF DIAGONAL 
     sub CX, CAR_HEIGHT / 2
     add DX, CAR_WIDTH / 2               ; IF IMG_DIR is Horizontal
     jmp GET_CAR_DI_INDEX
     SKIP_DX_ADDITION:
     sub CX, CAR_WIDTH / 2
     sub DX, CAR_HEIGHT / 2
+    cmp BL, RIGHT
+    jl GET_CAR_DI_INDEX                 ; IF Not Diagonal Skip Shifting
+    sub CX, CAR_WIDTH / 2
+    cmp BL, UP_LEFT
+    jz GET_CAR_DI_INDEX
+    cmp BL, DOWN_RIGHT
+    jz GET_CAR_DI_INDEX
+    add CX, CAR_WIDTH / 2
+    add CX, CAR_WIDTH / 2
+    add CX, CAR_WIDTH / 2               ; IF Shifted in the other direction
     GET_CAR_DI_INDEX:
     mov AX, 320
     mul DX
@@ -503,25 +547,51 @@ DRAW_HEIGHT:
         ;cmp SI, 0                      ; Pixel is Transparent
         ;jz  TRANSPARENT
         MOVSB
-        cmp BL, DOWN
-        jng  SKIP_DI_ADDITION           ; Horizontal
+        cmp BL, RIGHT                           
+        jl  SKIP_DI_ADDITION                ; SKIP IF VERTICAL
+        cmp BL, LEFT                           
+        jg  SKIP_DI_ADDITION                ; SKIP IF DIAGONAL 
         sub DI, 321
         SKIP_DI_ADDITION:
+        cmp BL, LEFT                           
+        jng  SKIP_SHIFT_DI_DIAG                ; SKIP IF DIAGONAL
+        sub DI, 320
+        cmp BL, UP_LEFT
+        jz SKIP_SHIFT_DI_DIAG
+        cmp BL, DOWN_RIGHT
+        jz SKIP_SHIFT_DI_DIAG
+        add DI, 640
+        SKIP_SHIFT_DI_DIAG:
         ;TRANSPARENT:
         cmp BL, DOWN             
         jz SKIP_SUBBING                 ; Facing Down
         cmp BL, RIGHT            
         jz SKIP_SUBBING                 ; Facing Right
-        sub SI, 2
+        cmp BL, DOWN_RIGHT            
+        jz SKIP_SUBBING                 ; Facing Down
+        cmp BL, DOWN_LEFT            
+        jz SKIP_SUBBING                 ; Facing Right
+        sub SI, 2                       ; IF Facing Up or Left decrement SI for IMG reversing
         SKIP_SUBBING:
         loop TRANSFER
     ; Go to next Row
     add DI, 320 - CAR_WIDTH
-    cmp BL, DOWN
-    jng  NEXT_BAR                       ; SKIP IF VERTICAL
+    cmp BL, RIGHT                           
+    jl  NEXT_BAR                ; SKIP IF VERTICAL
+    mov DI, AX
+    add DI, 320
+    inc DI
+    cmp BL, UP_LEFT
+    jz NEXT_BAR
+    cmp BL, DOWN_RIGHT
+    jz NEXT_BAR
+    sub DI, 2
+    cmp BL, LEFT                           
+    jg  NEXT_BAR                ; SKIP IF DIAGONAL 
     inc AX
     mov DI, AX
     NEXT_BAR:
+    mov AX, DI
     dec DX                              ; check if end condition
     cmp DX, 0
     jnz DRAW_HEIGHT
