@@ -13,24 +13,31 @@
 .model small
 .data
   ; Red Car
-  img1 DB 184, 113, 113, 6, 137, 209, 185, 113, 6, 6, 137, 232, 185, 113, 6, 6, 137, 234, 244, 136, 41, 41, 138, 21, 244, 136, 41, 41, 138, 21, 170, 161, 137, 137, 23, 170, 19, 3, 75, 75 
-       DB 74, 19, 185, 160, 25, 25, 163, 234, 112, 6, 6, 6, 6, 136, 184, 113, 6, 6, 137, 210, 185, 113, 113, 113, 113, 185
+  img1  DB 67, 43, 212, 140, 66, 43, 26, 21, 140, 43, 140, 24, 173, 169, 140, 43, 43, 236, 6, 43, 43, 43, 236, 6, 43, 43, 43, 140, 43, 43, 6, 43, 140, 6, 6, 138, 138, 138, 138, 137 
+        DB 0, 0, 0, 0, 0
   ; Blue Car
-  img2 DB 17, 222, 151, 150, 151, 223, 18, 128, 151, 150, 151, 223, 223, 128, 175, 175, 150, 246, 244, 150, 174, 174, 149, 244, 244, 150, 174, 174, 149, 244, 148, 148, 149, 149, 172, 148, 221, 3, 75, 75 
-       DB 74, 221, 223, 148, 3, 3, 172, 246, 223, 150, 175, 175, 174, 151, 223, 151, 150, 150, 150, 223, 200, 223, 223, 223, 223, 200
-       
-  ; Constants
-  CAR_WIDTH EQU 06h                                 ; The width of all cars
-  CAR_HEIGHT EQU 0Bh                                ; The height of all cars
-  CAR_SPEED EQU 2
+  img2  DB 246, 164, 25, 164, 20, 18, 138, 42, 140, 18, 18, 161, 140, 139, 223, 246, 23, 23, 170, 246, 246, 139, 42, 6, 19, 18, 139, 140, 140, 19, 224, 21, 162, 161, 19, 20, 162, 22, 162, 20 
+        DB 0, 0, 0, 0, 0
+ ; Constants
+  CAR_WIDTH             EQU 05h               ; The width of all cars
+  CAR_HEIGHT            EQU 09h               ; The height of all cars
+  CAR_SPEED             EQU 2
   ACCELERATION_INCREASE EQU 1
   ACCELERATION_DECREASE EQU 1
-  MAX_ACCELERATION EQU 8
-  GAME_BORDER_X_MIN EQU 0
-  GAME_BORDER_X_MAX EQU 320
-  ;GAME_BORDER_Y EQU 00A0h
-  GAME_BORDER_Y_MIN EQU 0
-  GAME_BORDER_Y_MAX EQU 200
+  MAX_ACCELERATION      EQU 8
+  
+  GAME_BORDER_X_MIN     EQU 0                ; track boundries
+  GAME_BORDER_X_MAX     EQU 320
+  GAME_BORDER_Y_MIN     EQU 0
+  GAME_BORDER_Y_MAX     EQU 180
+  SCREEN_WIDTH          EQU 320
+  SCREEN_HEIGHT         EQU 200
+  BLOCK_WIDTH           EQU 20
+  BLOCK_HEIGHT          EQU 20
+  WHITE_STRIP_WIDTH     EQU 1
+  WHITE_STRIP_HEIGHT    EQU 4
+  GREY                  EQU 08h
+  RED                   EQU 0Ch
   UP EQU 0
   DOWN EQU 1
   RIGHT EQU 2
@@ -45,8 +52,8 @@
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
 
-  CAR_X DW ?, ?                                   ; CenterX position of player1, player2
-  CAR_Y DW ?, ?                                   ; CenterY position of player1, player2
+  CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
+  CAR_Y DW 3Ah, 3Ah                                   ; CenterY position of player1, player2
   CAR_IMG_DIR DB UP, UP                 ; IMG Direction of player1, player2
   CAR_MOVEMENT_DIR DB DOWN, DOWN        ; Movement Direction of player1, player2
   CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
@@ -535,7 +542,7 @@ DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, B
     add CX, CAR_WIDTH / 2
     add CX, CAR_WIDTH / 2               ; IF Shifted in the other direction
     GET_CAR_DI_INDEX:
-    mov AX, 320
+    mov AX, SCREEN_WIDTH
     mul DX
     add AX, CX
     mov DI, AX                          ; load adress  (CX + DX * 320)
@@ -557,11 +564,11 @@ DRAW_HEIGHT:
         jl  SKIP_DI_ADDITION                ; SKIP IF VERTICAL
         cmp BL, LEFT                           
         jg  SKIP_DI_ADDITION                ; SKIP IF DIAGONAL 
-        sub DI, 321
+        sub DI, SCREEN_WIDTH + 1
         SKIP_DI_ADDITION:
         cmp BL, LEFT                           
         jng  SKIP_SHIFT_DI_DIAG                ; SKIP IF DIAGONAL
-        sub DI, 320
+        sub DI, SCREEN_WIDTH
         cmp BL, UP_LEFT
         jz SKIP_SHIFT_DI_DIAG
         cmp BL, DOWN_RIGHT
@@ -577,11 +584,11 @@ DRAW_HEIGHT:
         SKIP_SUBBING:
         loop TRANSFER
     ; Go to next Row
-    add DI, 320 - CAR_WIDTH
+    add DI, SCREEN_WIDTH - CAR_WIDTH
     cmp BL, RIGHT                           
     jl  NEXT_BAR                ; SKIP IF VERTICAL
     mov DI, AX
-    add DI, 320
+    add DI, SCREEN_WIDTH
     inc DI
     cmp BL, UP_LEFT
     jz NEXT_BAR

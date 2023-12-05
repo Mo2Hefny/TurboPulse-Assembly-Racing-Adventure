@@ -21,7 +21,6 @@ main proc far
 
   mov AX, 0A000h
   mov ES, AX
-
   ; Initialize Video Mode
   mov AX, 0013h                         ; Select 320x200, 256 color graphics
   int 10h

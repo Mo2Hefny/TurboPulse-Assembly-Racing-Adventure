@@ -5,20 +5,34 @@
 .model medium
 .stack 64
 .data
+    ; Constants
+    GAME_BORDER_X_MIN     EQU 0                ; track boundries
+    GAME_BORDER_X_MAX     EQU 320
+    GAME_BORDER_Y_MIN     EQU 0
+    GAME_BORDER_Y_MAX     EQU 180
+    SCREEN_WIDTH          EQU 320
+    SCREEN_HEIGHT         EQU 200
+    BLOCK_WIDTH           EQU 20
+    BLOCK_HEIGHT          EQU 20
+    WHITE_STRIP_WIDTH     EQU 1
+    WHITE_STRIP_HEIGHT    EQU 4
+    GREY                  EQU 08h
+    RED                   EQU 0Ch
+    UP EQU 0
+    DOWN EQU 1
+    RIGHT EQU 2
+    LEFT EQU 3
+    FINISH EQU 4
+
     direction        db ?                ; the randomized direction
 
     pathlength       dw 0                ;Current length of the track
     minpathlength    dw 30               ;MinPath Length Before Restarting
 
-    leftboundry      dw 0                ; track boundries
-    lowboundry       dw 160
-    rightboundry     dw 320
-    upperboundry     dw 0
-
     xstart           dw 0                ; starting indeces
     ystart           dw 80
-    currx            dw ?                ;Current pntY
-    curry            dw ?                ;Current pntX
+    CURR_X            dw ?                ;Current pntY
+    CURR_Y            dw ?                ;Current pntX
     max_rand         dw 25               ;Max Trials To Draw Before Restart
     curr_rand        dw 0                ;Current Trials to Draw
     runtime_loop     dw 377              ;Like Delay to Make sure we get random number every time
@@ -131,8 +145,8 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       mov  ax,0c06h
                       add  cx,2
                       add  dx,2
@@ -163,16 +177,16 @@ Make_Boost PROC                                         ;Draw Boost
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       CALL random_number
-                      CMP  direction, 0                 ; Blue boost  1
+                      CMP  direction, UP                 ; Blue boost  1
                       Jz   Blue
-                      CMP  direction, 1                 ; Yellow boost E
+                      CMP  direction, DOWN                 ; Yellow boost E
                       Jz   Yellow
-                      CMP  direction, 2                 ; Magenta boost D
+                      CMP  direction, LEFT                 ; Magenta boost D
                       JZ   Magenta
-                      CMP  direction,3                  ; Cyan boost C
+                      CMP  direction, RIGHT                  ; Cyan boost C
                       JZ   Cyan
     Blue:             mov  ax,0C01h
                       JMP  CONT_BOOST
@@ -213,32 +227,32 @@ draw_square PROC                                        ;Draw A gray Square to R
                       push di                           ;3
                       cmp  boolFinished,0
                       jz   no
-                      mov  ah,0ch
-                      mov  al,FinishLineColor
+                      mov  ah, 0ch
+                      mov  al, FinishLineColor
                       JMP  YES
     no:               mov  ax,0c08h
     YES:              
-                      mov  curr_rand,0
+                      mov  curr_rand, 0
                       inc  pathlength
-                      mov  cx,currx
-                      mov  dx,curry
-                      mov  bx,cx
-                      add  bx,20
-                      mov  di,dx
-                      add  di,20
+                      mov  cx, CURR_X
+                      mov  dx, CURR_Y
+                      mov  bx, cx
+                      add  bx, BLOCK_WIDTH
+                      mov  di, dx
+                      add  di, BLOCK_HEIGHT
     row:              int  10h
                       inc  cx
                       cmp  cx,bx
                       jz   column
                       jmp  row
     column:           
-                      sub  cx,20
+                      sub  cx, BLOCK_WIDTH
                       inc  dx
                       cmp  dx,di
                       jz   exit
                       jmp  row
     exit:             
-                      sub  dx,20
+                      sub  dx, BLOCK_HEIGHT
                       mov  ah, 2ch
                       int  21h
                       cmp  dl,Block_Percentage
@@ -261,8 +275,6 @@ GENERATE_TRACK proc far
                       mov  DS, AX
 
     ; Initialize Video Mode
-                      mov  AX, 0013h                    ; Select 320x200, 256 color graphics
-                      int  10h
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
 
 
@@ -280,14 +292,14 @@ GENERATE_TRACK proc far
                       call RESET_BACKGROUND             ;Resest Our Green BackGround
                       mov  cx,xstart
                       mov  dx,ystart
-                      mov  currx,cx
-                      mov  curry,dx
+                      mov  CURR_X,cx
+                      mov  CURR_Y,dx
                       call draw_square
                       mov  pathlength,1
                       mov  curr_rand,0
     GENERATE_LOOP:    
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       CALL random_number                ; Get a random direction
                       push ax
                       mov  ax,max_rand
@@ -295,15 +307,15 @@ GENERATE_TRACK proc far
                       pop  AX
                       jz   restart
     ; Process the direction to determine the movement
-                      CMP  direction, 0                 ; Up          00    --> xor 1 --> 01
+                      CMP  direction, UP                 ; Up
                       Jz   MOVE_UP
-                      CMP  direction, 1                 ; Down        01    --> xor 1 --> 00
+                      CMP  direction, DOWN                 ; Down 
                       Jz   MOVE_DOWN
-                      CMP  direction, 2                 ; Left        10    --> xor 1 --> 11
+                      CMP  direction, LEFT                 ; Left
                       jnz  rightdirection
                       jmp  far ptr MOVE_LEFT
     rightdirection:   
-                      CMP  direction, 3                 ; Right       11    --> xor 1 --> 10
+                      CMP  direction, RIGHT                 ; Right
                       jnz  nodirection
                       jmp  far ptr MOVE_RIGHT
     nodirection:      
@@ -312,196 +324,196 @@ GENERATE_TRACK proc far
 
 
     MOVE_UP:          
-                      cmp  dx,upperboundry              ;if out of boundries
+                      cmp  dx,GAME_BORDER_Y_MIN              ;if out of boundries
                       JNZ  skipupbound
                       jmp  far ptr GENERATE_LOOP
     skipupbound:      
-                      sub  dx,20
-                      mov  ah,0dh                       ; if current pixel is gray
+                      sub  dx, BLOCK_HEIGHT
+                      mov  ah, 0dh                      ; Get pixel color to AL
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY                     ; if current pixel is gray
                       jz   GENERATE_LOOP                ; Block already found
 
-                      cmp  dx,0
+                      cmp  dx, GAME_BORDER_Y_MIN
                       jz   skipup                       ; New Block At Screen Top
 
-                      sub  dx,20                        ; if upper pixel is gray
+                      sub  dx, BLOCK_HEIGHT             ; if upper pixel is gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jz   GENERATE_LOOP                ; New Block will generate loop (connected above it)
-                      add  dx,20
+                      add  dx, BLOCK_HEIGHT
     skipup:           
 
-                      cmp  cx,300                       ; if at right boundary
+                      cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH   ; if at right boundary
                       jz   skipup2
 
-                      add  cx,20                        ; if right pixel gray
+                      add  cx, BLOCK_WIDTH              ; if right pixel gray
                       int  10h                          ; get color
-                      cmp  al,08
+                      cmp  al, GREY
                       jz   GENERATE_LOOP                ; New Block will generate loop (connected on its right)
-                      sub  cx,20
+                      sub  cx, BLOCK_WIDTH
     skipup2:          
-                      cmp  cx,0
+                      cmp  cx, GAME_BORDER_X_MIN
                       jz   skipup3                      ; if at left boundary
-                      sub  cx,20                        ;if left pixel gray
+                      sub  cx, BLOCK_WIDTH              ;if left pixel gray
                       int  10h                          ;get color
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipup3
                       jmp  far ptr GENERATE_LOOP        ; New Block will generate loop (connected on its left)
-    skipup3:          sub  curry,20
+    skipup3:          sub  CURR_Y, BLOCK_HEIGHT
                       call draw_square
-                      mov al, 0
+                      mov al, UP                        ; Store UP direction
                       call STORE_DIRECTION
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     MOVE_DOWN:        
-                      cmp  dx,160                       ;;out of bound
-                      jnz  skipdownboundry
+                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT ;out of bound
+                      jnz  skipdownboundary
                       jmp  far ptr GENERATE_LOOP
-    skipdownboundry:  
-                      add  dx,20
+    skipdownboundary:  
+                      add  dx, BLOCK_HEIGHT
                       mov  ah,0dh                       ; if current pixel is gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra2
                       jmp  far ptr GENERATE_LOOP
     extra2:           
-                      cmp  dx,160
+                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
                       jz   skipdown
 
-                      add  dx,20                        ; if lower pixel is gray
+                      add  dx, BLOCK_HEIGHT                        ; if lower pixel is gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra3
                       jmp  far ptr GENERATE_LOOP
     extra3:           
-                      sub  dx,20
+                      sub  dx, BLOCK_HEIGHT
 
     skipdown:         
 
-                      cmp  cx,300                       ;; if at right boundrie
+                      cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH  ; if at right boundrie
                       jz   skipdown2
 
-                      add  cx,20                        ;if right pixel gray
+                      add  cx, BLOCK_WIDTH              ;if right pixel gray
                       int  10h                          ;get color
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra4
                       jmp  far ptr GENERATE_LOOP
     extra4:           
-                      sub  cx,20
+                      sub  cx, BLOCK_WIDTH
     skipdown2:        
-                      cmp  cx,0
+                      cmp  cx, GAME_BORDER_X_MIN
                       jz   skipdown3
 
-                      sub  cx,20                        ;if left pixel gray
+                      sub  cx, BLOCK_WIDTH              ;if left pixel gray
                       int  10h                          ;get color
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipdown3
                       jmp  far ptr GENERATE_LOOP
 
 
     skipdown3:        
-                      add  curry,20
+                      add  CURR_Y, BLOCK_HEIGHT
                       call draw_square
-                      mov al, 1
+                      mov al, DOWN
                       call STORE_DIRECTION
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     MOVE_LEFT:        
 
-                      cmp  cx,leftboundry               ;if out of boundries
-                      jnz  skipleftboundry
+                      cmp  cx, GAME_BORDER_X_MIN               ;if out of boundries
+                      jnz  skipleftboundary
                       jmp  far ptr GENERATE_LOOP
-    skipleftboundry:  
+    skipleftboundary:  
 
-                      sub  cx,20
-                      mov  ah,0dh                       ; if current pixel is gray
+                      sub  cx, BLOCK_WIDTH
+                      mov  ah, 0dh                       ; if current pixel is gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipleft
                       jmp  far ptr GENERATE_LOOP
     skipleft:         
-                      cmp  dx,160
+                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
                       jz   skipleft2                    ; if lower pixel is gray
-                      add  dx,20
+                      add  dx, BLOCK_HEIGHT
                       int  10h
-                      cmp  al,08
-                      jnz  extra5                       ;
+                      cmp  al, GREY
+                      jnz  extra5                       
                       jmp  far ptr GENERATE_LOOP
     extra5:           
-                      sub  dx,20
+                      sub  dx, BLOCK_HEIGHT
     skipleft2:        
-                      cmp  dx,upperboundry
+                      cmp  dx, GAME_BORDER_Y_MIN
                       jz   skipleft3
-                      sub  dx,20                        ;if upper pixel gray
+                      sub  dx, BLOCK_HEIGHT                   ;if upper pixel gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra6
                       jmp  far ptr GENERATE_LOOP
-    extra6:           add  dx,20
+    extra6:           add  dx, BLOCK_HEIGHT
     skipleft3:        
-                      cmp  cx,leftboundry               ;if left pixel gray
+                      cmp  cx, GAME_BORDER_X_MIN               ;if left pixel gray
                       jz   skipleft4
-                      sub  cx,20
+                      sub  cx, BLOCK_WIDTH
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipleft4
                       jmp  far ptr GENERATE_LOOP
     skipleft4:        
-                      sub  currx,20
+                      sub  CURR_X, BLOCK_WIDTH
                       call draw_square
-                      mov al, 2
+                      mov al, LEFT
                       call STORE_DIRECTION
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     MOVE_RIGHT:       
-                      cmp  cx,300                       ;if out of boundries
-                      jnz  skiprightboundry
+                      cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH   ;if out of boundries
+                      jnz  skiprightboundary
                       jmp  far ptr GENERATE_LOOP
-    skiprightboundry: 
-                      add  cx,20
+    skiprightboundary: 
+                      add  cx, BLOCK_WIDTH
                       mov  ah,0dh                       ; if current pixel is gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipright
                       jmp  far ptr GENERATE_LOOP
     skipright:        
-                      cmp  dx,160
+                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
                       jz   skipright2
-                      add  dx,20
+                      add  dx, BLOCK_HEIGHT
                       int  10h                          ;if lower
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra7
                       jmp  far ptr GENERATE_LOOP
-    extra7:           sub  dx,20
+    extra7:           sub  dx, BLOCK_HEIGHT
     skipright2:       
-                      cmp  dx,upperboundry
+                      cmp  dx, GAME_BORDER_Y_MIN
                       jz   skipright3
-                      sub  dx,20                        ;if upper pixel gray
+                      sub  dx, BLOCK_HEIGHT                        ;if upper pixel gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  extra8
                       jmp  far ptr GENERATE_LOOP
-    extra8:           add  dx,20
+    extra8:           add  dx, BLOCK_HEIGHT
     skipright3:       
 
-                      cmp  cx,300
+                      cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH
                       jz   skipright4
-                      add  cx,20                        ;if right pixel gray
+                      add  cx, BLOCK_WIDTH                        ;if right pixel gray
                       int  10h
-                      cmp  al,08
+                      cmp  al, GREY
                       jnz  skipright4
                       jmp  far ptr GENERATE_LOOP
     skipright4:       
-                      add  currx,20
+                      add  CURR_X, BLOCK_WIDTH
                       call draw_square
-                      mov al, 3
+                      mov al, RIGHT
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
-                      MOV  boolFinished,1
-                      mov al, 4
+                      MOV  boolFinished, 1
+                      mov al, FINISH
                       call STORE_DIRECTION
                       call DECORATE_TRACK
                       ;CALL draw_square                  ;Draw Our Final RedSqaure To Represnt End Line
@@ -529,10 +541,10 @@ DECORATE_TRACK proc near
     push AX
     mov CX, xstart
     mov DX, ystart
-    mov currx, CX
-    mov curry, DX
+    mov CURR_X, CX
+    mov CURR_Y, DX
     lea BX, DIRECTIONS
-    mov ah, 3
+    mov ah, RIGHT
     loop_on_directions:
     call TRACK_BORDER
     mov AL, -1
@@ -540,35 +552,35 @@ DECORATE_TRACK proc near
     jnz NOT_START
     jmp NEXT_DIRECTION
     NOT_START:
-    mov AL, 0
+    mov AL, UP
     cmp [BX], AL                                        ; UP (0)
     jnz NOT_UP
     call TRACK_VERTICAL
-    sub curry, 20                                       ; Go to upper block
+    sub CURR_Y, BLOCK_HEIGHT                            ; Go to upper block
     jmp NEXT_DIRECTION
     NOT_UP:
-    inc AL
+    mov AL, DOWN
     cmp [BX], AL                                        ; DOWN (1)
     jnz NOT_DOWN
-    add curry, 20
+    add CURR_Y, BLOCK_HEIGHT
     call TRACK_VERTICAL
     jmp NEXT_DIRECTION
     NOT_DOWN:
-    inc AL
-    cmp [BX], AL                                        ; LEFT (2)
-    jnz NOT_LEFT
-    call TRACK_HORIZONTAL
-    sub currx, 20
-    jmp NEXT_DIRECTION
-    NOT_LEFT:
-    inc AL
+    mov AL, RIGHT
     cmp [BX], AL                                        ; RIGHT (3)
     jnz NOT_RIGHT
-    add currx, 20
+    add CURR_X, BLOCK_WIDTH
     call TRACK_HORIZONTAL
     jmp NEXT_DIRECTION
     NOT_RIGHT:
-    inc AL
+    mov AL, LEFT
+    cmp [BX], AL                                        ; LEFT (2)
+    jnz NOT_LEFT
+    call TRACK_HORIZONTAL
+    sub CURR_X, BLOCK_WIDTH
+    jmp NEXT_DIRECTION
+    NOT_LEFT:
+    mov AL, FINISH
     cmp [BX], AL                                        ; END
     jz EXIT_DECORATE_TRACK
     ;jnz EXIT_DECORATE_TRACK
@@ -587,18 +599,18 @@ DECORATE_TRACK proc near
 DECORATE_TRACK endp
 ;-------------------------------------------------------
 TRACK_VERTICAL proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       push ax
                       push bx
                       push di
                       mov  ax,0c0fh
-                      add  cx,9                         ; Send to upper block center
-                      sub  dx,11                        ; Send to upper block center
+                      add  cx, BLOCK_WIDTH / 2 - 1          ; Send to upper block center
+                      sub  dx, BLOCK_HEIGHT / 2 + 1         ; Send to upper block center
                       mov  bx,cx
                       mov  di,dx
-                      add  bx,1
-                      add  di,4
+                      add  bx, WHITE_STRIP_WIDTH
+                      add  di, WHITE_STRIP_HEIGHT
     TOP_STRIP:        int  10h
                       inc  cx
                       cmp  cx,bx
@@ -608,13 +620,13 @@ TRACK_VERTICAL proc near
                       cmp DX, DI
                       jl TOP_STRIP
 
-                      mov  dx,curry
-                      add  dx,9                        ; Send to lower block center
+                      mov  dx,CURR_Y
+                      add  dx, BLOCK_HEIGHT / 2 - 1         ; Send to lower block center
                       mov  di,dx
-                      sub  di,4
+                      sub  di, WHITE_STRIP_HEIGHT
     BOTTOM_STRIP:     int  10h
                       inc  cx
-                      cmp  cx,bx
+                      cmp  cx, bx
                       jl  BOTTOM_STRIP
                       sub  CX, 1
                       dec DX
@@ -628,18 +640,18 @@ TRACK_VERTICAL proc near
 TRACK_VERTICAL endp
 ;-------------------------------------------------------
 TRACK_HORIZONTAL proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       push ax
                       push bx
                       push di
                       mov  ax,0c0fh
-                      sub  cx,11                        ; Send to left block center
-                      add  dx,9                         ; Send to left block center
+                      sub  cx, BLOCK_WIDTH / 2 + 1      ; Send to left block center
+                      add  dx, BLOCK_HEIGHT / 2 - 1     ; Send to left block center
                       mov  bx,cx
                       mov  di,dx
-                      add  bx,4
-                      add  di,1
+                      add  bx, WHITE_STRIP_HEIGHT
+                      add  di, WHITE_STRIP_WIDTH
     LEFT_STRIP:       int  10h
                       inc  dx
                       cmp  dx,di
@@ -649,10 +661,10 @@ TRACK_HORIZONTAL proc near
                       cmp CX, BX
                       jl LEFT_STRIP
 
-                      mov  cx,currx
-                      add  cx,9                        ; Send to right block center
+                      mov  cx,CURR_X
+                      add  cx, BLOCK_WIDTH / 2 - 1                        ; Send to right block center
                       mov  bx,cx
-                      sub  bx,4
+                      sub  bx, WHITE_STRIP_HEIGHT
     RIGHT_STRIP:      int  10h
                       inc  dx
                       cmp  dx,di
@@ -675,17 +687,17 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
     xor al, [BX]                                        ; ZF = (prev == current)
     jz NO_CORNER
     mov al, [BX]
-    cmp al, 0                                        ; Corner upwards
+    cmp al, UP                                        ; Corner upwards
     jz CORNER_UP
-    cmp al, 1                                        ; Corner downwards
+    cmp al, DOWN                                        ; Corner downwards
     jz CORNER_DOWN
-    cmp al, 2                                        ; Corner left
+    cmp al, LEFT                                        ; Corner left
     jz CORNER_LEFT
     jmp CORNER_RIGHT
 
     NO_CORNER:
-        mov AH, 2                                       ; LEFT
-        cmp [BX], AH
+        mov AH, RIGHT                                   ; RIGHT
+        cmp [BX], AH                                    ; IF Vertical
         jl BLOCK_V
         call BORDER_UP
         call BORDER_DOWN
@@ -697,7 +709,7 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
 
     CORNER_UP:
         call BORDER_DOWN
-        cmp AH, 3
+        cmp AH, RIGHT                                   ; RIGHT
         jz RIGHT_UP_CORNER
         call BORDER_LEFT
         jmp EXIT_TRACK_BORDER
@@ -707,7 +719,7 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
 
     CORNER_DOWN:
         call BORDER_UP
-        cmp AH, 3
+        cmp AH, RIGHT
         jz RIGHT_DOWN_CORNER
         call BORDER_LEFT
         jmp EXIT_TRACK_BORDER
@@ -717,7 +729,7 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
 
     CORNER_RIGHT:
         call BORDER_LEFT
-        cmp AH, 0
+        cmp AH, UP
         jz UP_RIGHT_CORNER
         call BORDER_DOWN
         jmp EXIT_TRACK_BORDER
@@ -727,7 +739,7 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
 
     CORNER_LEFT:
         call BORDER_RIGHT
-        cmp AH, 0
+        cmp AH, UP
         jz UP_LEFT_CORNER
         call BORDER_DOWN
         jmp EXIT_TRACK_BORDER
@@ -742,18 +754,18 @@ TRACK_BORDER proc near                                  ; AH: prev, [BX]: curren
 TRACK_BORDER endp
 ;-------------------------------------------------------
 BORDER_LEFT proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx, CURR_X
+                      mov  dx, CURR_Y
                       push SI
                       push ax
                       push bx
                       push di
                       mov  ax,0c0ch                     ; RED
                       mov  bx,0c0fh                     ; WHITE
-                      sub cx, 1
+                      sub cx, 1                         ; Start beside the track
                       js EXIT_BORDER_LEFT               ; left border
                       mov di, dx
-                      add di, 20
+                      add di, BLOCK_HEIGHT
                       mov si, 5
     LEFT_BORDER:      int  10h
                       dec si
@@ -772,19 +784,19 @@ BORDER_LEFT proc near
 BORDER_LEFT endp
 ;-------------------------------------------------------
 BORDER_RIGHT proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       push SI
                       push ax
                       push bx
                       push di
                       mov  ax,0c0ch                     ; RED
                       mov  bx,0c0fh                     ; WHITE
-                      add cx, 20
-                      cmp cx, rightboundry
+                      add cx, BLOCK_WIDTH               ; Start beside the track
+                      cmp cx, GAME_BORDER_X_MAX
                       jz EXIT_BORDER_RIGHT
                       mov di, dx
-                      add di, 20
+                      add di, BLOCK_HEIGHT
                       mov si, 5
     RIGHT_BORDER:     int  10h
                       dec si
@@ -803,18 +815,18 @@ BORDER_RIGHT proc near
 BORDER_RIGHT endp
 ;-------------------------------------------------------
 BORDER_UP proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       push SI
                       push ax
                       push bx
                       push di
                       mov  ax,0c0ch                     ; RED
                       mov  bx,0c0fh                     ; WHITE
-                      sub dx, 1
+                      sub dx, 1                         ; Start above the track
                       js EXIT_BORDER_UP                 ; left border
                       mov di, cx
-                      add di, 20
+                      add di, BLOCK_WIDTH
                       mov si, 5
     UP_BORDER:        int  10h
                       dec si
@@ -833,19 +845,19 @@ BORDER_UP proc near
 BORDER_UP endp
 ;-------------------------------------------------------
 BORDER_DOWN proc near
-                      mov  cx,currx
-                      mov  dx,curry
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
                       push SI
                       push ax
                       push bx
                       push di
                       mov  ax,0c0ch                     ; RED
                       mov  bx,0c0fh                     ; WHITE
-                      add dx, 20
+                      add dx, BLOCK_HEIGHT              ; Start below the track
                       cmp dx, 181
                       jz EXIT_BORDER_DOWN
                       mov di, cx
-                      add di, 20
+                      add di, BLOCK_WIDTH
                       mov si, 5
     DOWN_BORDER:     int  10h
                       dec si

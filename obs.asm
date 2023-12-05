@@ -43,6 +43,8 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   mov PLAYER_X, CX
   mov PLAYER_Y, DX
   mov BX, OBSTACLES_COUNT
+  cmp BX, 0
+  jz EXIT_CHECK_COLLISION
   CHECK_OBSTACLE_COLLISION:
     sub BX, 2
     mov DL, 6
@@ -112,9 +114,12 @@ DRAW_OBSTACLES proc far
     mov AX, OBSTACLES_TYPE[BX]
     mov CX, OBSTACLES_X[BX]
     mov DX, OBSTACLES_Y[BX]
-    cmp AX, 0                           ; TYPE 0
+    cmp AX, -1                          ; TYPE -1
+    jz EXIT_DRAW_OBSTACLES
+    cmp AX, 0                           ; TYPE 0: Obstacle
     jnz SKIP_0
     call DRAW_TYPE_0
+    EXIT_DRAW_OBSTACLES:
     SKIP_0:
 
     ; Loop On The Next Obstacle
