@@ -47,6 +47,7 @@ main proc far
 
   ; Get the systen time
   CHECK_TIME:
+    
     mov AH, 2Ch
     int 21h                             ; CH = hour CL = minute DH - second DL = 1/100 seconds
     cmp DL, TIME_AUX                    ; fps = 100
@@ -55,11 +56,11 @@ main proc far
   ; Else draw the new frame
   ;call Load_Track
   ; Draw Obstacles
-  call DRAW_OBSTACLES
   ; Draw Cars
   call MOVE_CARS
   mov AX, 0A000h
   mov ES, AX
+  call DRAW_OBSTACLES
   call DRAW_CARS
   
   ; Repeat the process

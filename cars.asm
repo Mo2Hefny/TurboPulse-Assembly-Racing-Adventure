@@ -3,8 +3,10 @@
   ; PATHGEN.asm
   EXTRN xstart:WORD
   EXTRN ystart:WORD
+  EXTRN CLEAR_ENTITY:FAR
   ; OBSTACLES.asm
   EXTRN CHECK_COLLISION:FAR
+  ; PUBLIC
   PUBLIC LOAD_CARS
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
@@ -13,11 +15,13 @@
 .model small
 .data
   ; Red Car
-  img1  DB 67, 43, 212, 140, 66, 43, 26, 21, 140, 43, 140, 24, 173, 169, 140, 43, 43, 236, 6, 43, 43, 43, 236, 6, 43, 43, 43, 140, 43, 43, 6, 43, 140, 6, 6, 138, 138, 138, 138, 137 
-        DB 0, 0, 0, 0, 0
+  img1  DB 184, 113, 6, 137, 233, 184, 113, 6, 137, 136, 235, 6, 41, 137, 21, 235, 6, 41, 137, 21, 170, 161, 138, 163, 170, 244, 27, 75, 74, 20, 113, 137, 163, 138, 137, 112, 4, 6, 6, 136 
+        DB 185, 113, 113, 111, 209
+
   ; Blue Car
-  img2  DB 246, 164, 25, 164, 20, 18, 138, 42, 140, 18, 18, 161, 140, 139, 223, 246, 23, 23, 170, 246, 246, 139, 42, 6, 19, 18, 139, 140, 140, 19, 224, 21, 162, 161, 19, 20, 162, 22, 162, 20 
-        DB 0, 0, 0, 0, 0
+  img2  DB 200, 128, 150, 151, 247, 200, 128, 150, 151, 246, 151, 150, 174, 175, 150, 150, 150, 174, 175, 150, 148, 148, 173, 172, 148, 220, 78, 75, 78, 150, 222, 173, 172, 173, 151, 222, 150, 175, 175, 151 
+        DB 200, 222, 222, 222, 200
+  
  ; Constants
   CAR_WIDTH             EQU 05h               ; The width of all cars
   CAR_HEIGHT            EQU 09h               ; The height of all cars
@@ -51,6 +55,7 @@
   OLD_TIME_AUX DB 0
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
+  CURRENT_VELOCITY DW ?
 
   CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
   CAR_Y DW 3Ah, 3Ah                                   ; CenterY position of player1, player2
@@ -81,20 +86,17 @@ MOVE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
-  ; CHECK PLAYER ONE
-  mov ax, 0
-  in AL, 60h
-  lea DI, CAR1_KEYS
-  lea BX, CAR1_KEYS_STATUS
-  call READ_BUFFER
-  lea DI, CAR2_KEYS
-  lea BX, CAR2_KEYS_STATUS
-  call READ_BUFFER
+
+  ; Check Keyboard
+  call CHECK_INPUT_UPDATES
 
   ; Player One
   mov AL, 0
   mov CURRENT_CAR, AL
   call UPDATE_CAR
+
+  ; Check Keyboard
+  call CHECK_INPUT_UPDATES
 
   ; Player Two
   mov AL, 2
@@ -122,6 +124,11 @@ UPDATE_CAR proc near
   ; Move PLayer One
   xor BX, BX
   mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  mov BL, CAR_HEIGHT
+  call CLEAR_ENTITY
+  mov BL, CURRENT_CAR
   call MOVE_CAR
   ; RESET DIRECTION IF CAR IS AT REST
   xor BX, BX
@@ -145,6 +152,21 @@ UPDATE_CAR proc near
   SKIP_COLLISION_FIX:
   ret
 UPDATE_CAR endp
+;-------------------------------------------------------
+CHECK_INPUT_UPDATES proc near
+  mov ax, 0
+  in AL, 60h
+  cmp AL, 0
+  jz EXIT_CHECK_INPUT_UPDATES
+  lea DI, CAR1_KEYS
+  lea BX, CAR1_KEYS_STATUS
+  call READ_BUFFER
+  lea DI, CAR2_KEYS
+  lea BX, CAR2_KEYS_STATUS
+  call READ_BUFFER
+  EXIT_CHECK_INPUT_UPDATES:
+  ret
+CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
 READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
   ; Check Selected Car Input
@@ -340,7 +362,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
                                         ; NOT WORKING XD
   mov CL, 3                            
   SAR AX, CL                            ; To make acceleration smaller
-  mov DX, AX                            ; (Velocity + Boost) * Acceleration(DX)
+  mov CURRENT_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
@@ -350,6 +372,7 @@ MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   lea SI, [CAR_Y + BX]
   sar BX, 1
   mov AL, [CAR_IMG_DIR + BX]
+  mov DX, CURRENT_VELOCITY
   ; Move Car According To The Current Direction
   ; Horizontal Movement
   cmp AL, 0
@@ -614,7 +637,7 @@ LOAD_CARS proc far                      ; AL: Start Direction
   mov [CAR_X], BX
   add BX, 9
   mov [CAR_X + 2], BX
-  cmp AL, 0
+  cmp AL, UP
   jnz LOAD_CARS_DOWN
   mov [CAR_IMG_DIR], UP
   mov [CAR_IMG_DIR + 1], UP
@@ -624,7 +647,7 @@ LOAD_CARS proc far                      ; AL: Start Direction
   mov [CAR_Y + 2], BX
   ret
   LOAD_CARS_DOWN:
-  cmp AL, 1
+  cmp AL, DOWN
   jnz LOAD_CARS_LEFT
   mov [CAR_IMG_DIR], DOWN
   mov [CAR_IMG_DIR + 1], DOWN
@@ -639,7 +662,7 @@ LOAD_CARS proc far                      ; AL: Start Direction
   mov [CAR_Y], BX
   add BX, 9
   mov [CAR_Y + 2], BX
-  cmp AL, 2
+  cmp AL, LEFT
   jnz LOAD_CARS_RIGHT
   mov [CAR_IMG_DIR], LEFT
   mov [CAR_IMG_DIR + 1], LEFT

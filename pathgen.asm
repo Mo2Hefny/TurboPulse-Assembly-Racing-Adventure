@@ -1,5 +1,6 @@
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
+    PUBLIC CLEAR_ENTITY
     PUBLIC xstart
     PUBLIC ystart
 .model medium
@@ -47,6 +48,53 @@
     ;;;;;;;;;;;;;;;; done
 
 .code
+;-------------------------------------------------------
+CLEAR_ENTITY proc far                                   ; CX: centerX of entity, DX: centerY of entity, BX: dimension
+    push SI
+    push DI
+    push DX
+    push CX
+    push BX
+    push AX
+    push ES
+    mov AX, 0A000h
+    mov ES, AX
+    ; Top Left
+    shr BL, 1
+    sub CX, BX
+    sub DX, BX
+    ; Get DI and SI indexing
+    mov AX, SCREEN_WIDTH
+    mul DX
+    add AX, CX
+    mov DI, AX
+    lea SI, TRACK
+    add SI, AX
+    shl BL, 1
+    or BL, 1
+    mov DX, BX
+    mov  ah,0ch
+    CLEAR_ENTITY_ROW:             
+        mov CX, BX
+        rep MOVSB
+        add SI, SCREEN_WIDTH
+        sub SI, BX
+        cmp SI, 57800
+        jnb EXIT_CLEAR_ENTITY
+        add DI, SCREEN_WIDTH
+        sub DI, BX
+        dec DX 
+        jnz  CLEAR_ENTITY_ROW
+    EXIT_CLEAR_ENTITY:
+    pop ES
+    pop AX
+    pop BX
+    pop CX
+    pop DX
+    pop DI
+    pop SI
+    ret
+CLEAR_ENTITY endp
 ;-------------------------------------------------------
 RESET_BACKGROUND proc
     ; (Send to TRACK file)
@@ -516,9 +564,9 @@ GENERATE_TRACK proc far
                       mov al, FINISH
                       call STORE_DIRECTION
                       call DECORATE_TRACK
-                      ;CALL draw_square                  ;Draw Our Final RedSqaure To Represnt End Line
-                      call Save_Track                   ;Save Track in Array For Further Usage
-                      mov al, DIRECTIONS
+                      ;CALL draw_square                 ; Draw Our Final RedSqaure To Represnt End Line
+                      call Save_Track                   ; Save Track in Array For Further Usage
+                      mov al, DIRECTIONS                ; Store first direction for cars starting direction
                       ;HLT
                       ret
 GENERATE_TRACK endp
