@@ -631,7 +631,6 @@ DECORATE_TRACK proc near
     mov AL, FINISH
     cmp [BX], AL                                        ; END
     jz EXIT_DECORATE_TRACK
-    ;jnz EXIT_DECORATE_TRACK
     NEXT_DIRECTION:
     mov ah, [BX]                                        ; Store Previous Direction
     inc BX
@@ -731,29 +730,51 @@ TRACK_HORIZONTAL endp
 TRACK_BORDER proc near                                  ; AH: prev, [BX]: current
     push AX
     push BX
-    mov al, ah
-    xor al, [BX]                                        ; ZF = (prev == current)
+    mov AL, AH
+    xor AL, [BX]                                        ; ZF = (prev == current)
     jz NO_CORNER
-    mov al, [BX]
-    cmp al, UP                                        ; Corner upwards
-    jz CORNER_UP
-    cmp al, DOWN                                        ; Corner downwards
-    jz CORNER_DOWN
-    cmp al, LEFT                                        ; Corner left
-    jz CORNER_LEFT
-    jmp CORNER_RIGHT
-
+    mov AL, [BX]
+    cmp AL, FINISH
+    jnz CORNER
+    
     NO_CORNER:
-        mov AH, RIGHT                                   ; RIGHT
-        cmp [BX], AH                                    ; IF Vertical
+        cmp AH, RIGHT                                    ; IF Vertical
         jl BLOCK_V
         call BORDER_UP
         call BORDER_DOWN
+        cmp AL, FINISH
+        jnz SKIP_FINISH
+        call END_BLOCK_V
+        cmp AH, RIGHT
+        jnz SKIP_FINISH_RIGHT
+        call BORDER_RIGHT
+        jmp EXIT_TRACK_BORDER
+        SKIP_FINISH_RIGHT:
+        call BORDER_LEFT
         jmp EXIT_TRACK_BORDER
         BLOCK_V:
         call BORDER_LEFT
         call BORDER_RIGHT
+        cmp AL, FINISH
+        jnz SKIP_FINISH
+        call END_BLOCK_H
+        cmp AH, UP
+        jnz SKIP_FINISH_UP
+        call BORDER_UP
         jmp EXIT_TRACK_BORDER
+        SKIP_FINISH_UP:
+        call BORDER_DOWN
+        SKIP_FINISH:
+        jmp EXIT_TRACK_BORDER
+
+    CORNER:
+    cmp AL, UP                                        ; Corner upwards
+    jz CORNER_UP
+    cmp AL, DOWN                                        ; Corner downwards
+    jz CORNER_DOWN
+    cmp AL, LEFT                                        ; Corner left
+    jz CORNER_LEFT
+    jmp CORNER_RIGHT
 
     CORNER_UP:
         call BORDER_DOWN
@@ -922,5 +943,59 @@ BORDER_DOWN proc near
                       pop SI
                       ret
 BORDER_DOWN endp
+;-------------------------------------------------------
+END_BLOCK_V proc near
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
+                      push SI
+                      push ax
+                      push bx
+                      push di
+                      add  cx, 5         ; Shift End Line
+                      cmp AH, LEFT
+                      jnz END_BLOCK_RIGHT
+                      add  cx, 10         ; Shift End Line
+                      END_BLOCK_RIGHT:
+                      mov  ax, 0c0fh                     ; WHITE
+                      mov di, dx
+                      add di, BLOCK_HEIGHT
+    ENDLINE_V:        int  10h
+                      inc dx
+                      xor cx, 1
+                      cmp di, dx
+                      jnz ENDLINE_V
+    EXIT_ENDLINE_V:   pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      pop SI
+                      ret
+END_BLOCK_V endp
+;-------------------------------------------------------
+END_BLOCK_H proc near
+                      mov  cx,CURR_X
+                      mov  dx,CURR_Y
+                      push SI
+                      push ax
+                      push bx
+                      push di
+                      add  dx, 5         ; Shift End Line
+                      cmp AH, UP
+                      jnz END_BLOCK_DOWN
+                      add  dx, 10         ; Shift End Line
+                      END_BLOCK_DOWN:
+                      mov  ax, 0c0fh                     ; WHITE
+                      mov di, cx
+                      add di, BLOCK_WIDTH
+    ENDLINE_H:        int  10h
+                      inc cx
+                      xor dx, 1
+                      cmp di, cx
+                      jnz ENDLINE_H
+    EXIT_ENDLINE_H:   pop  di                           ;3
+                      pop  bx                           ;2
+                      pop  ax                           ;1
+                      pop SI
+                      ret
+END_BLOCK_H endp
 ;-------------------------------------------------------
 end
