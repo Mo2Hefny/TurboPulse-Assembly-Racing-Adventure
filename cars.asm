@@ -116,12 +116,8 @@ MOVE_CARS proc far
 MOVE_CARS endp
 ;-------------------------------------------------------
 UPDATE_CAR proc near
-  mov BX, 0
-  mov BL, CURRENT_CAR
   call CHECK_INPUT
   ; Simulate acceleration for player one
-  xor BX, BX
-  mov BL, CURRENT_CAR
   call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
   ; Move PLayer
   xor BX, BX
@@ -132,8 +128,6 @@ UPDATE_CAR proc near
   call CLEAR_ENTITY
   call MOVE_CAR
   ; RESET DIRECTION IF CAR IS AT REST
-  xor BX, BX
-  mov BL, CURRENT_CAR
   call CAR_AT_REST
   ; Check For Collision
   xor BX, BX
@@ -144,11 +138,7 @@ UPDATE_CAR proc near
   mov AL, [CAR_IMG_DIR + BX]
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   jnz SKIP_COLLISION_FIX
-  xor BX, BX
-  mov BL, CURRENT_CAR
   call FIX_COLLISION
-  xor BX, BX
-  mov BL, CURRENT_CAR
   call MOVE_CAR
   SKIP_COLLISION_FIX:
   call CHECK_PATH_COLLISION
@@ -195,6 +185,8 @@ READ_BUFFER endp
 ;-------------------------------------------------------
 CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR, [SI]: MOVEMENT_DIR
   ; Load Car Info Depending on BX: Car_Number
+  mov BX, 0
+  mov BL, CURRENT_CAR
   lea DI, CAR1_KEYS_STATUS
   cmp BX, 2
   jnz CHECK_CAR1_KEYS
@@ -307,6 +299,8 @@ CHANGE_DIRECTION endp
 ;-------------------------------------------------------
 HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   ; Load Car Info Depending on BX: Car_Number
+  xor BX, BX
+  mov BL, CURRENT_CAR
   lea DI, [CAR_ACCELERATION + BX]
   shr BX, 1
   cmp CX, 0
@@ -493,6 +487,8 @@ FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
 FIX_BOUNDARIES_CONDITION endp
 ;-------------------------------------------------------
 CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
+  xor BX, BX
+  mov BL, CURRENT_CAR
   shr BX, 1
   mov AL, [CAR_IMG_DIR + BX]
   lea SI, [CAR_MOVEMENT_DIR + BX]
@@ -504,6 +500,8 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
 CAR_AT_REST endp
 ;-------------------------------------------------------
 FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
+  xor BX, BX
+  mov BL, CURRENT_CAR
   lea DI, [CAR_ACCELERATION + BX]
   shr BX, 1
   mov AL, [CAR_IMG_DIR + BX]
