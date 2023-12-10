@@ -100,8 +100,8 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     CHECK_NEXT_OBSTACLE:
     cmp BX, 0
     jnz CHECK_OBSTACLE_COLLISION
-  or AX, -1                            ; ZF = 0 since no collision has occured
   EXIT_CHECK_COLLISION:
+  or AX, -1                            ; ZF = 0 since no collision has occured
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
@@ -109,6 +109,8 @@ DRAW_OBSTACLES proc far
   mov AX, 0A000h
   mov ES, AX
   mov BX, OBSTACLES_COUNT
+  cmp BX, 0
+  jz EXIT_DRAW_OBSTACLES
   DRAW_OBSTACLE:
     sub BX, 2
     mov AX, OBSTACLES_TYPE[BX]

@@ -4,6 +4,7 @@
   EXTRN xstart:WORD
   EXTRN ystart:WORD
   EXTRN CLEAR_ENTITY:FAR
+  EXTRN CHECK_CAR_ON_PATH:FAR
   ; OBSTACLES.asm
   EXTRN CHECK_COLLISION:FAR
   ; PUBLIC
@@ -62,6 +63,7 @@
   CAR_IMG_DIR DB UP, UP                 ; IMG Direction of player1, player2
   CAR_MOVEMENT_DIR DB DOWN, DOWN        ; Movement Direction of player1, player2
   CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
+  CAR_COLLISION DB 0, 0                         ; Acceleration Value of player1, player2
 
           ; Release Press
   CAR1_KEYS DB 0C8h, 48h                            ; UP : 8, 7
@@ -121,14 +123,13 @@ UPDATE_CAR proc near
   xor BX, BX
   mov BL, CURRENT_CAR
   call HANDLE_ACCELERATION              ; Stores in DX Position to be added, Position = Position + DX
-  ; Move PLayer One
+  ; Move PLayer
   xor BX, BX
   mov BL, CURRENT_CAR
   mov CX, [CAR_X + BX]
   mov DX, [CAR_Y + BX]
   mov BL, CAR_HEIGHT
   call CLEAR_ENTITY
-  mov BL, CURRENT_CAR
   call MOVE_CAR
   ; RESET DIRECTION IF CAR IS AT REST
   xor BX, BX
@@ -150,6 +151,8 @@ UPDATE_CAR proc near
   mov BL, CURRENT_CAR
   call MOVE_CAR
   SKIP_COLLISION_FIX:
+  call CHECK_PATH_COLLISION
+  EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
 ;-------------------------------------------------------
@@ -368,6 +371,8 @@ HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
 MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
   ; Load Car Info Depending on BX: Car_Number
+  xor BX, BX
+  mov BL, CURRENT_CAR
   lea DI, [CAR_X + BX]
   lea SI, [CAR_Y + BX]
   sar BX, 1
@@ -527,10 +532,76 @@ FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATIO
   ret
 FIX_COLLISION endp
 ;-------------------------------------------------------
+CHECK_PATH_COLLISION proc near
+  push DI
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  mov AX, 0
+  shr BX, 1
+  mov AH, [CAR_MOVEMENT_DIR + BX]
+  cmp AH, Left
+  jz CHECK_HORIZONTAL
+  cmp AH, Right
+  jz CHECK_HORIZONTAL
+  ; Vertical
+  add CX, CAR_WIDTH / 2
+  mov BX, CX
+  sub CX, CAR_WIDTH                     ; BX -> CX + CAR_WIDTH
+  cmp AH, UP
+  jnz CHECK_DOWN
+  ; Go To Upper Side
+  sub DX, CAR_HEIGHT / 2
+  mov DI, DX
+  jmp CHECK_PATH
+  CHECK_DOWN:
+  ; Go To Lower Side
+  add DX, CAR_HEIGHT / 2
+  mov DI, DX
+  jmp CHECK_PATH
+  CHECK_HORIZONTAL:
+  ; Horizontal
+  add DX, CAR_WIDTH / 2
+  mov DI, DX
+  sub DX, CAR_WIDTH                     ; DI -> DX + CAR_WIDTH
+  cmp AH, LEFT
+  jnz CHECK_RIGHT
+  ; Go To Left Side
+  sub CX, CAR_HEIGHT / 2
+  mov BX, CX
+  jmp CHECK_PATH
+  CHECK_RIGHT:
+  ; Go To Right Side
+  add CX, CAR_HEIGHT / 2
+  mov BX, CX
+  jmp CHECK_PATH
+  CHECK_PATH:
+  call CHECK_CAR_ON_PATH
+  cmp AL, 0
+  jz EXIT_CHECK_PATH
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov AX, 0
+  mov [CAR_ACCELERATION + BX], AX
+  mov AX, CURRENT_VELOCITY
+  xor AX, -1
+  add AX, 1
+  mov CURRENT_VELOCITY, AX
+  call MOVE_CAR
+  EXIT_CHECK_PATH:
+  pop DI
+  ret
+CHECK_PATH_COLLISION endp
+;-------------------------------------------------------
 DRAW_CARS proc far
   mov CX, CAR_X                        ; Set initial column (X)
   mov DX, CAR_Y                        ; Set initial row (Y)
   lea SI, img1                          ; Load image adress
+  cmp CAR_COLLISION, 0
+  jz skip_col1
+  lea SI, img2                          ; Load image adress
+  skip_col1:
   mov BL, CAR_IMG_DIR                  ; Set Face Direction
   call DRAW_CAR
 

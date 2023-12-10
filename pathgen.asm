@@ -1,6 +1,7 @@
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
     PUBLIC CLEAR_ENTITY
+    PUBLIC CHECK_CAR_ON_PATH
     PUBLIC xstart
     PUBLIC ystart
 .model medium
@@ -321,7 +322,7 @@ GENERATE_TRACK proc far
 
                       mov  AX, @data
                       mov  DS, AX
-
+                      xor BX, BX
     ; Initialize Video Mode
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
 
@@ -998,4 +999,48 @@ END_BLOCK_H proc near
                       ret
 END_BLOCK_H endp
 ;-------------------------------------------------------
+CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER, BX: X_SEC_CORNER, DI: Y_SEC_CORNER
+    push BX
+    call GET_BLOCK_INDEX
+    mov AH, 0dh
+    int 10h
+    pop BX
+    xor  al, GREY
+    cmp al, 0
+    jnz EXIT_CHECK_CAR_ON_PATH
+    ; CHECK NEXT CORNER
+    sub DI, BLOCK_HEIGHT
+    cmp DI, DX
+    jnl CHECK_OTHER_CORNER_DOWN
+    sub BX, BLOCK_WIDTH
+    cmp BX, CX
+    jl EXIT_CHECK_CAR_ON_PATH
+    add CX, BLOCK_WIDTH
+    jmp CHECK_OTHER_CORNER
+    CHECK_OTHER_CORNER_DOWN:
+    add DX, BLOCK_HEIGHT
+    CHECK_OTHER_CORNER:
+    mov AH, 0dh
+    int 10h
+    xor  al, GREY
+    EXIT_CHECK_CAR_ON_PATH:
+    ;xor al, 1
+    ret
+CHECK_CAR_ON_PATH endp
+;-------------------------------------------------------
+GET_BLOCK_INDEX proc near               ; CX: X, DX, Y
+    mov AX, CX
+    mov BL, BLOCK_WIDTH
+    div BL
+    mov AH, 0
+    mul BL
+    mov CX, AX
+    mov AX, DX
+    mov BL, BLOCK_HEIGHT
+    div BL
+    mov AH, 0
+    mul BL
+    mov DX, AX
+    ret
+GET_BLOCK_INDEX endp
 end
