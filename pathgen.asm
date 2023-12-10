@@ -1,3 +1,5 @@
+    ; OBSTACLES.asm
+    EXTRN ADD_OBSTACLE:FAR
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
     PUBLIC CLEAR_ENTITY
@@ -196,26 +198,10 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       push di                           ;3
                       mov  cx,CURR_X
                       mov  dx,CURR_Y
-                      mov  ax,0c06h
-                      add  cx,2
-                      add  dx,2
-                      mov  bx,cx
-                      add  bx,Block_SIZE
-                      mov  di,dx
-                      add  di,Block_SIZE
-    row1:             int  10h
-                      inc  cx
-                      cmp  cx,bx
-                      jz   column1
-                      jmp  row1
-    column1:          
-                      sub  cx,Block_SIZE
-                      inc  dx
-                      cmp  dx,di
-                      jz   exit1
-                      jmp  row1
-    exit1:            
-                      sub  dx,Block_SIZE
+                      add  cx,4
+                      add  dx,4
+                      mov AX, 0
+                      ;call ADD_OBSTACLE
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1

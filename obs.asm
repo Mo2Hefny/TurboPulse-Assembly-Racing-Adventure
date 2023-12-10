@@ -43,8 +43,7 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   mov PLAYER_X, CX
   mov PLAYER_Y, DX
   mov BX, OBSTACLES_COUNT
-  cmp BX, 0
-  jz EXIT_CHECK_COLLISION
+  ;jmp CHECK_NEXT_OBSTACLE
   CHECK_OBSTACLE_COLLISION:
     sub BX, 2
     mov DL, 6

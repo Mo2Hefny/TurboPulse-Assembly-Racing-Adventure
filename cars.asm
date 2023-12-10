@@ -136,12 +136,8 @@ UPDATE_CAR proc near
   mov DX, [CAR_Y + BX]
   shr BX, 1
   mov AL, [CAR_IMG_DIR + BX]
-  call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
-  jnz SKIP_COLLISION_FIX
-  call FIX_COLLISION
-  call MOVE_CAR
-  SKIP_COLLISION_FIX:
-  call CHECK_PATH_COLLISION
+  call CHECK_ENTITY_COLLISION
+  ;call CHECK_PATH_COLLISION
   EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
@@ -498,6 +494,15 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
   EXIT_CAR_AT_REST:
   ret
 CAR_AT_REST endp
+;-------------------------------------------------------
+CHECK_ENTITY_COLLISION proc near
+  call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+  jnz SKIP_COLLISION_FIX
+  call FIX_COLLISION
+  call MOVE_CAR
+  SKIP_COLLISION_FIX:
+  ret
+CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
 FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
   xor BX, BX
