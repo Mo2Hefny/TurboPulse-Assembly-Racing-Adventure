@@ -6,14 +6,16 @@
 .model small
 .data
   ; Constants
-  CAR_WIDTH EQU 06h       ; The width of all cars
-  CAR_HEIGHT EQU 0Bh      ; The height of all cars
+  CAR_WIDTH EQU 05h               ; The width of all cars
+  CAR_HEIGHT EQU 09h               ; The height of all cars
   DOWN EQU 1
   ; Variables
-  MAX_OBSTACLES_NUM EQU 30
-  TYPE_WIDTH  DB 7
-  TYPE_HEIGHT DB 7
-  TYPE0 DB 49 dup(130)
+  ; 0 Obstacle, 1 Speed Boost, 2 Slow down, 3 Drop an Obstacle, 4 Pass through
+  MAX_OBSTACLES_NUM EQU 100
+  TYPE_WIDTH  DB 4
+  TYPE_HEIGHT DB 4
+  TYPE0 DB 16 dup(0)
+  ;TYPE1 DB 25 dup(09h)
   OLD_TIME_AUX DB 0
   OBSTACLES_COUNT DW 0
   OBSTACLES_TYPE DW MAX_OBSTACLES_NUM dup(-1)
@@ -43,11 +45,11 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   mov PLAYER_X, CX
   mov PLAYER_Y, DX
   mov BX, OBSTACLES_COUNT
-  ;jmp CHECK_NEXT_OBSTACLE
+  jmp CHECK_NEXT_OBSTACLE
   CHECK_OBSTACLE_COLLISION:
     sub BX, 2
-    mov DL, 6
-    mov DH, 11
+    mov DL, CAR_WIDTH
+    mov DH, CAR_HEIGHT
     mov AL, PLAYER_DIRECTION
     cmp AL, 3
     jnz SKIP_DIMENSION_SWITCH           ; IF Vertical DL = W, DH = H
@@ -99,8 +101,8 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
     CHECK_NEXT_OBSTACLE:
     cmp BX, 0
     jnz CHECK_OBSTACLE_COLLISION
-  EXIT_CHECK_COLLISION:
   or AX, -1                            ; ZF = 0 since no collision has occured
+  EXIT_CHECK_COLLISION:
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------

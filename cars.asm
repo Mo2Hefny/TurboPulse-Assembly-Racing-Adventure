@@ -130,14 +130,8 @@ UPDATE_CAR proc near
   ; RESET DIRECTION IF CAR IS AT REST
   call CAR_AT_REST
   ; Check For Collision
-  xor BX, BX
-  mov BL, CURRENT_CAR
-  mov CX, [CAR_X + BX]
-  mov DX, [CAR_Y + BX]
-  shr BX, 1
-  mov AL, [CAR_IMG_DIR + BX]
   call CHECK_ENTITY_COLLISION
-  ;call CHECK_PATH_COLLISION
+  call CHECK_PATH_COLLISION
   EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
@@ -496,9 +490,16 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
 CAR_AT_REST endp
 ;-------------------------------------------------------
 CHECK_ENTITY_COLLISION proc near
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  shr BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   jnz SKIP_COLLISION_FIX
   call FIX_COLLISION
+  mov CURRENT_VELOCITY, DX
   call MOVE_CAR
   SKIP_COLLISION_FIX:
   ret

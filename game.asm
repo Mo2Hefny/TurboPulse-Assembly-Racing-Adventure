@@ -36,18 +36,18 @@ main proc far
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
   ;;;;;;; TESTING COLLISION ;;;;;;
-  mov AX, 0
-  mov CX, 25
-  mov DX, 85
-  call ADD_OBSTACLE
-  mov AX, 0
-  mov CX, 5
-  mov DX, 105
-  call ADD_OBSTACLE
-  mov AX, 0
-  mov CX, 5
-  mov DX, 65
-  call ADD_OBSTACLE
+  ;mov AX, 0
+  ;mov CX, 25
+  ;mov DX, 85
+  ;call ADD_OBSTACLE
+  ;mov AX, 0
+  ;mov CX, 5
+  ;mov DX, 105
+  ;call ADD_OBSTACLE
+  ;mov AX, 0
+  ;mov CX, 5
+  ;mov DX, 65
+  ;call ADD_OBSTACLE
 
   ; Get the systen time
   CHECK_TIME:

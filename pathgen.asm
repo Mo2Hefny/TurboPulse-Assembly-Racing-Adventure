@@ -201,7 +201,7 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       add  cx,4
                       add  dx,4
                       mov AX, 0
-                      ;call ADD_OBSTACLE
+                      call ADD_OBSTACLE
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1
@@ -288,6 +288,9 @@ draw_square PROC                                        ;Draw A gray Square to R
                       jmp  row
     exit:             
                       sub  dx, BLOCK_HEIGHT
+                      mov dx, CURR_BLOCK
+                      cmp dx, 2
+                      jng Dont_Boost
                       mov  ah, 2ch
                       int  21h
                       cmp  dl,Block_Percentage
