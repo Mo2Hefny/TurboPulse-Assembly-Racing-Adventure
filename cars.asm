@@ -42,6 +42,7 @@
   WHITE_STRIP_WIDTH     EQU 1
   WHITE_STRIP_HEIGHT    EQU 4
   GREY                  EQU 08h
+  GREEN                 EQU 02h
   RED                   EQU 0Ch
   UP EQU 0
   DOWN EQU 1
@@ -582,8 +583,12 @@ CHECK_PATH_COLLISION proc near
   jmp CHECK_PATH
   CHECK_PATH:
   call CHECK_CAR_ON_PATH
-  cmp AL, 0
-  jz EXIT_CHECK_PATH
+  cmp al, GREEN
+  jz PATH_COLLISION
+  cmp al, RED
+  jz PATH_COLLISION
+  jmp EXIT_CHECK_PATH
+  PATH_COLLISION:
   xor BX, BX
   mov BL, CURRENT_CAR
   mov AX, 0

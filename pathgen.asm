@@ -21,6 +21,7 @@
     WHITE_STRIP_WIDTH     EQU 1
     WHITE_STRIP_HEIGHT    EQU 4
     GREY                  EQU 08h
+    GREEN                 EQU 02h
     RED                   EQU 0Ch
     UP EQU 0
     DOWN EQU 1
@@ -43,7 +44,7 @@
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 57800 DUP (?)    ;To save and Load Track
-    Block_Percentage db 10               ;real Percentage
+    Block_Percentage db 30               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
@@ -106,7 +107,7 @@ RESET_BACKGROUND proc
                       xor  AL, AL                       ; Clear entire screen
                       xor  CX, CX                       ; Upper left corner CH=row, CL=column
                       mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
-                      mov  BH, 02h                      ; Green-BackGround
+                      mov  BH, GREEN                      ; Green-BackGround
                       int  10h
                       ret
 RESET_BACKGROUND endp
@@ -159,24 +160,33 @@ Load_Track proc                                         ;Function To Load Track 
                       ret
 Load_Track endp
 ;-------------------------------------------------------
-random_number proc
+RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
+    push cx
+    push dx
+    mov  di,runtime_loop
+    f1:               
+    mov  ah, 2ch
+    int  21h
+    mov  ah, 0
+    mov  al, dl                       ;;micro seconds
+    div  bl
+    dec  di
+    cmp  di,0                         ;;; ah = rest
+    jnz  f1
+    pop dx
+    pop cx
+    ret
+RANDOM_NUMBER endp
+;-------------------------------------------------------
+random_direction proc
                       push bx                           ;1
                       push ax                           ;2
                       push dx                           ;3
                       push cx                           ;4
                       push di                           ;5
                       inc  curr_rand
-                      mov  di,runtime_loop
-    f1:               
-                      mov  ah, 2ch
-                      int  21h
-                      mov  ah, 0
-                      mov  al, dl                       ;;micro seconds
                       mov  bl, 4
-                      div  bl
-                      dec  di
-                      cmp  di,0                         ;;; ah = rest
-                      jnz  f1
+                      call RANDOM_NUMBER
                       mov  al, direction
                       xor  al, 1
                       cmp  ah, al
@@ -190,16 +200,28 @@ random_number proc
                       pop  ax                           ;2
                       pop  bx                           ;1
                       ret
-random_number endp
+random_direction endp
 ;-------------------------------------------------------
 PATH_BLOCK proc                                         ;Draw Brown (06h) Square to Represent Path Block
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov  cx,CURR_X
-                      mov  dx,CURR_Y
-                      add  cx,4
-                      add  dx,4
+                      mov cx, CURR_X
+                      mov dx, CURR_Y
+                      mov bl, 4
+                      call RANDOM_NUMBER
+                      mov al, ah
+                      mov bl, 5
+                      mul bl
+                      add ax, 2
+                      add cx, ax                        ; 0, 5, 10, 15
+                      mov  bl, 4
+                      call RANDOM_NUMBER
+                      mov al, ah
+                      mov bl, 5
+                      mul bl
+                      add ax, 2
+                      add dx, ax                        ; 0, 5, 10, 15
                       mov AX, 0
                       call ADD_OBSTACLE
                       pop  di                           ;3
@@ -214,7 +236,7 @@ Make_Boost PROC                                         ;Draw Boost
                       push di                           ;3
                       mov  cx,CURR_X
                       mov  dx,CURR_Y
-                      CALL random_number
+                      CALL random_direction
                       CMP  direction, UP                 ; Blue boost  1
                       Jz   Blue
                       CMP  direction, DOWN                 ; Yellow boost E
@@ -338,7 +360,7 @@ GENERATE_TRACK proc far
     GENERATE_LOOP:    
                       mov  cx,CURR_X
                       mov  dx,CURR_Y
-                      CALL random_number                ; Get a random direction
+                      CALL random_direction                ; Get a random direction
                       push ax
                       mov  ax,max_rand
                       cmp  curr_rand,ax
@@ -994,9 +1016,10 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     mov AH, 0dh
     int 10h
     pop BX
-    xor  al, GREY
-    cmp al, 0
-    jnz EXIT_CHECK_CAR_ON_PATH
+    cmp al, GREEN
+    jz EXIT_CHECK_CAR_ON_PATH
+    cmp al, RED
+    jz EXIT_CHECK_CAR_ON_PATH
     ; CHECK NEXT CORNER
     sub DI, BLOCK_HEIGHT
     cmp DI, DX
@@ -1011,7 +1034,10 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     CHECK_OTHER_CORNER:
     mov AH, 0dh
     int 10h
-    xor  al, GREY
+    cmp al, GREEN
+    jz EXIT_CHECK_CAR_ON_PATH
+    cmp al, RED
+    jz EXIT_CHECK_CAR_ON_PATH
     EXIT_CHECK_CAR_ON_PATH:
     ;xor al, 1
     ret
