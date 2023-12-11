@@ -3,6 +3,7 @@
   PUBLIC ADD_OBSTACLE
   PUBLIC CHECK_COLLISION
   PUBLIC DRAW_OBSTACLES
+  PUBLIC OBSTACLES_COUNT
 .model small
 .data
   ; Constants
@@ -34,14 +35,17 @@
 .code
 ;-------------------------------------------------------
 ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Type
-  mov BX, OBSTACLES_COUNT
+  xor BX, BX
+  mov BL, AH
+  mov OBSTACLES_COUNT, BX
   cmp BL, MAX_OBSTACLES_NUM
+  mov AH, 0
   jnl EXIT_ADD_OBSTACLE
   mov OBSTACLES_X[BX], CX
   mov OBSTACLES_Y[BX], DX
   mov OBSTACLES_TYPE[BX], AX
-  mov AX, 2
-  add [OBSTACLES_COUNT], AX
+  ;mov AX, 2
+  ;add [OBSTACLES_COUNT], AX
   EXIT_ADD_OBSTACLE:
   ret
 ADD_OBSTACLE endp

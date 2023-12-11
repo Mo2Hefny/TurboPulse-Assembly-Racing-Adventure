@@ -1,5 +1,6 @@
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
+    EXTRN OBSTACLES_COUNT:WORD
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
     PUBLIC CLEAR_ENTITY
@@ -30,9 +31,10 @@
     FINISH EQU 4
 
     direction        db ?                ; the randomized direction
+    ENTITIES_COUNT   db 0
 
     pathlength       dw 0                ;Current length of the track
-    minpathlength    dw 30               ;MinPath Length Before Restarting
+    minpathlength    dw 40               ;MinPath Length Before Restarting
 
     xstart           dw 0                ; starting indeces
     ystart           dw 80
@@ -44,7 +46,7 @@
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 57800 DUP (?)    ;To save and Load Track
-    Block_Percentage db 30               ;real Percentage
+    Block_Percentage db 10               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
@@ -207,21 +209,26 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       push di                           ;3
                       mov cx, CURR_X
                       mov dx, CURR_Y
-                      mov bl, 4
+                      mov bx, 4
                       call RANDOM_NUMBER
                       mov al, ah
-                      mov bl, 5
+                      mov ah, 0
+                      mov bx, 5
                       mul bl
                       add ax, 2
                       add cx, ax                        ; 0, 5, 10, 15
                       mov  bl, 4
                       call RANDOM_NUMBER
                       mov al, ah
-                      mov bl, 5
+                      mov ah, 0
+                      mov bx, 5
                       mul bl
                       add ax, 2
                       add dx, ax                        ; 0, 5, 10, 15
-                      mov AX, 0
+                      mov AH, ENTITIES_COUNT
+                      mov AL, 0
+                      inc ENTITIES_COUNT
+                      inc ENTITIES_COUNT
                       call ADD_OBSTACLE
                       pop  di                           ;3
                       pop  bx                           ;2
@@ -314,6 +321,8 @@ draw_square PROC                                        ;Draw A gray Square to R
                       jng Dont_Boost
                       mov  ah, 2ch
                       int  21h
+                      ;cmp  dl,Block_Percentage
+                      and dl, prev_rand
                       cmp  dl,Block_Percentage
                       ja   Dont_block
                       call PATH_BLOCK
@@ -340,6 +349,7 @@ GENERATE_TRACK proc far
     restart:                                            ;Restart Only if less than MinPathLength
                       mov dx, CURR_BLOCK
                       mov CURR_BLOCK, 0
+                      mov ENTITIES_COUNT, 0
                       push ax
                       mov  ax,minpathlength
                       cmp  pathlength,ax
