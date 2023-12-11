@@ -40,7 +40,7 @@
     CURR_Y            dw ?                ;Current pntX
     max_rand         dw 25               ;Max Trials To Draw Before Restart
     curr_rand        dw 0                ;Current Trials to Draw
-    runtime_loop     dw 377              ;Like Delay to Make sure we get random number every time
+    prev_rand        db 0
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 57800 DUP (?)    ;To save and Load Track
@@ -163,16 +163,15 @@ Load_Track endp
 RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
     push cx
     push dx
-    mov  di,runtime_loop
-    f1:               
     mov  ah, 2ch
     int  21h
     mov  ah, 0
     mov  al, dl                       ;;micro seconds
+    add al, prev_rand
+    mov cl, dh
+    ror al, cl
+    mov prev_rand, al
     div  bl
-    dec  di
-    cmp  di,0                         ;;; ah = rest
-    jnz  f1
     pop dx
     pop cx
     ret
