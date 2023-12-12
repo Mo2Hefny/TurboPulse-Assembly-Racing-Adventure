@@ -49,7 +49,7 @@ drawImage proc                                         ;Function To Load Track F
                       ret
 drawImage endp
 
-MAIN PROC FAR
+MAINMENU PROC FAR
     MOV AX,@DATA
     MOV DS,AX
 
