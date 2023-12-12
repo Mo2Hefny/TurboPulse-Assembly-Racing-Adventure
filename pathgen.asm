@@ -14,7 +14,7 @@
     GAME_BORDER_X_MIN     EQU 0                ; track boundries
     GAME_BORDER_X_MAX     EQU 320
     GAME_BORDER_Y_MIN     EQU 0
-    GAME_BORDER_Y_MAX     EQU 180
+    GAME_BORDER_Y_MAX     EQU 160
     SCREEN_WIDTH          EQU 320
     SCREEN_HEIGHT         EQU 200
     BLOCK_WIDTH           EQU 20

@@ -13,7 +13,77 @@
 .stack 64
 .data
   TIME_AUX  DB 0                        ; Used when checking if time has changed.code
+  min db 0
+  sec db 10
+  currsec db ?
+  message db "both players lost","$"
 .code
+jmp main
+  ;-------------------------------------------------------
+RESET_BACKGROUND proc near
+  ; (Send to TRACK file)
+  ; Set background color to WHITE
+  mov AH, 06h                           ; Scroll up function
+  xor AL, AL                            ; Clear entire screen
+  xor CX, CX                            ; Upper left corner CH=row, CL=column
+  mov DX, 184Fh                         ; lower right corner DH=row, DL=column 
+  mov BH, 1Eh                           ; YellowOnBlue
+  int 10h
+  ret
+RESET_BACKGROUND endp
+;-------------------------------------------------------
+dtime proc
+;display min
+    mov ah,2
+    mov bh,0
+    mov dh,2eh
+    mov dl,43h
+    int 10h
+    MOV dl,'0'
+    mov ah,2
+    int 21h
+    mov al,min
+    add al,30h
+    mov dl,al
+    mov ah,02
+    int 21h
+    mov dl,':'
+    mov ah,2
+    int 21H
+;display sec
+    mov bh,10
+    mov al,sec
+    mov ah,0
+    div bh
+    add al,30h
+    add ah,30h
+    mov bh,ah
+    mov dl,al
+    mov ah,02
+    int 21h
+    mov dl,Bh
+    mov ah,02
+    int 21h
+    ret
+dtime endp 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+modify proc 
+    mov cl,sec
+    cmp cl,0
+    jz adjustmin
+    MOV currsec,dh
+    dec sec
+    call dtime
+    jmp retlabel
+adjustmin:cmp min,0
+          JZ retlabel
+          dec min
+          mov sec,60
+          call dtime
+
+retlabel:
+    ret
+modify endp
 main proc far
 
   mov AX, @data
@@ -35,6 +105,11 @@ main proc far
   ; Generate Track
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
+
+   mov AH, 2Ch                          ;initialize currentsec
+   int 21h                             
+   mov currsec,dh 
+
   ;;;;;;; TESTING COLLISION ;;;;;;
   ;mov AX, 0
   ;mov CX, 25
@@ -54,6 +129,14 @@ main proc far
     
     mov AH, 2Ch
     int 21h                             ; CH = hour CL = minute DH - second DL = 1/100 seconds
+    cmp currsec,dh
+    jz skipcheck 
+    call modify
+    cmp  min,0
+    jnz skipcheck
+    cmp sec,0
+    jz terminate
+skipcheck:
     cmp DL, TIME_AUX                    ; fps = 100
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
@@ -71,21 +154,14 @@ main proc far
   jmp CHECK_TIME
 
   ; Terminate Program
-  mov ah, 4Ch
+terminate:
+  mov ah,2
+  mov dx,0A0Ah
+  mov bh,0
+  int 10h
+  mov ah,9
+  lea dx,message
   int 21h
 
 main endp
-;-------------------------------------------------------
-RESET_BACKGROUND proc near
-  ; (Send to TRACK file)
-  ; Set background color to WHITE
-  mov AH, 06h                           ; Scroll up function
-  xor AL, AL                            ; Clear entire screen
-  xor CX, CX                            ; Upper left corner CH=row, CL=column
-  mov DX, 184Fh                         ; lower right corner DH=row, DL=column 
-  mov BH, 1Eh                           ; YellowOnBlue
-  int 10h
-  ret
-RESET_BACKGROUND endp
-;-------------------------------------------------------
 end main
