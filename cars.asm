@@ -161,15 +161,24 @@ READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEY
   mov DX, 8
   sub DL, CL
   sar Dl, 1
-  add BX, DX
+  
   and CL, 1
-  mov [BX], CL
-  cmp CL, 0
-  jz EXIT_READ_KEYBOARD
-  sub BX, DX
-  xor DX, 1
+  cmp CL, 1
+  jnz SKIP_RESETING
+  mov ch, 0
+  mov [BX], ch
+  mov [BX + 1], ch
+  mov [BX + 2], ch
+  mov [BX + 3], ch
+  SKIP_RESETING:
   add BX, DX
-  mov [BX], CH
+  mov [BX], CL
+  ;cmp CL, 0
+  ;jz EXIT_READ_KEYBOARD
+  ;sub BX, DX
+  ;xor DX, 1
+  ;add BX, DX
+  ;mov [BX], CH
   EXIT_READ_KEYBOARD:
     ret
 READ_BUFFER endp
@@ -604,6 +613,8 @@ CHECK_PATH_COLLISION proc near
 CHECK_PATH_COLLISION endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
+  mov AX, 0A000h
+  mov ES, AX
   mov CX, CAR_X                        ; Set initial column (X)
   mov DX, CAR_Y                        ; Set initial row (Y)
   lea SI, img1                          ; Load image adress

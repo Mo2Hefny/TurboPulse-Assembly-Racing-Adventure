@@ -14,7 +14,7 @@
     GAME_BORDER_X_MIN     EQU 0                ; track boundries
     GAME_BORDER_X_MAX     EQU 320
     GAME_BORDER_Y_MIN     EQU 0
-    GAME_BORDER_Y_MAX     EQU 180
+    GAME_BORDER_Y_MAX     EQU 160
     SCREEN_WIDTH          EQU 320
     SCREEN_HEIGHT         EQU 200
     BLOCK_WIDTH           EQU 20
@@ -48,7 +48,7 @@
     TRACK            DB 57800 DUP (?)    ;To save and Load Track
     Block_Percentage db 10               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 50               ;100-this Percentage so if 90 its 10
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
     ;;;;;;;;;;;;;;;; done
@@ -162,6 +162,15 @@ Load_Track proc                                         ;Function To Load Track 
                       ret
 Load_Track endp
 ;-------------------------------------------------------
+GET_RANDOM_INDEX proc near      ; BL: number of indexes, BH: multiply
+ call RANDOM_NUMBER
+ mov al, ah
+ mov ah, 0
+ mov bl, bh
+ mul bl
+ ret
+GET_RANDOM_INDEX endp
+;-------------------------------------------------------
 RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
     push cx
     push dx
@@ -170,7 +179,9 @@ RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
     mov  ah, 0
     mov  al, dl                       ;;micro seconds
     add al, prev_rand
-    mov cl, dh
+    mov cx, CURR_X
+    ror al, cl
+    mov cx, CURR_Y
     ror al, cl
     mov prev_rand, al
     div  bl
@@ -209,22 +220,16 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       push di                           ;3
                       mov cx, CURR_X
                       mov dx, CURR_Y
-                      mov bx, 4
-                      call RANDOM_NUMBER
-                      mov al, ah
-                      mov ah, 0
-                      mov bx, 5
-                      mul bl
-                      add ax, 2
-                      add cx, ax                        ; 0, 5, 10, 15
-                      mov  bl, 4
-                      call RANDOM_NUMBER
-                      mov al, ah
-                      mov ah, 0
-                      mov bx, 5
-                      mul bl
-                      add ax, 2
-                      add dx, ax                        ; 0, 5, 10, 15
+                      mov bx, 0504h
+                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
+                                                        ; 0, 5, 10, 15
+                      add ax, 2                         ; 2, 7, 12, 17
+                      add cx, ax
+                      mov bx, 0504h
+                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
+                                                        ; 0, 5, 10, 15
+                      add ax, 2                         ; 2, 7, 12, 17
+                      add dx, ax
                       mov AH, ENTITIES_COUNT
                       mov AL, 0
                       inc ENTITIES_COUNT
@@ -240,43 +245,28 @@ Make_Boost PROC                                         ;Draw Boost
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov  cx,CURR_X
-                      mov  dx,CURR_Y
-                      CALL random_direction
-                      CMP  direction, UP                 ; Blue boost  1
-                      Jz   Blue
-                      CMP  direction, DOWN                 ; Yellow boost E
-                      Jz   Yellow
-                      CMP  direction, LEFT                 ; Magenta boost D
-                      JZ   Magenta
-                      CMP  direction, RIGHT                  ; Cyan boost C
-                      JZ   Cyan
-    Blue:             mov  ax,0C01h
-                      JMP  CONT_BOOST
-    Yellow:           mov  ax,0C0Eh
-                      JMP  CONT_BOOST
-    Magenta:          mov  ax,0C0Dh
-                      JMP  CONT_BOOST
-    Cyan:             mov  ax,0C03h
-    CONT_BOOST:       
-                      add  cx,2
-                      add  dx,2
-                      mov  bx,cx
-                      add  bx,Block_SIZE
-                      mov  di,dx
-                      add  di,Block_SIZE
-    roW7:             int  10h
-                      inc  cx
-                      cmp  cx,bx
-                      jz   column7
-                      jmp  row7
-    column7:          
-                      sub  cx,Block_SIZE
-                      inc  dx
-                      cmp  dx,di
-                      jz   exit7
-                      jmp  row7
-    exit7:            
+                      mov cx, CURR_X
+                      mov dx, CURR_Y
+                      mov bx, 0503h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                                        ; 0, 5, 10
+                      add ax, 5                         ; 5, 10, 15
+                      add cx, ax
+                      mov bx, 0503h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                                        ; 0, 5, 10
+                      add ax, 5                         ; 5, 10, 15
+                      add dx, ax
+                      mov bl, 4                         ; 4 options
+                      CALL RANDOM_NUMBER
+                      mov al, ah
+                      inc al
+    SPEED_BOOST:      mov AH, ENTITIES_COUNT
+                      inc ENTITIES_COUNT
+                      inc ENTITIES_COUNT
+                      call ADD_OBSTACLE
+                      jmp EXIT_MAKE_BOOST
+    EXIT_MAKE_BOOST:
                       sub  dx,Block_SIZE
                       pop  di                           ;3
                       pop  bx                           ;2
@@ -319,15 +309,16 @@ draw_square PROC                                        ;Draw A gray Square to R
                       mov dx, CURR_BLOCK
                       cmp dx, 2
                       jng Dont_Boost
-                      mov  ah, 2ch
-                      int  21h
-                      ;cmp  dl,Block_Percentage
-                      and dl, prev_rand
-                      cmp  dl,Block_Percentage
+                      mov bl, 100
+                      call RANDOM_NUMBER
+                      cmp  ah,Block_Percentage
                       ja   Dont_block
                       call PATH_BLOCK
+                      jmp Dont_Boost
     Dont_block:       
-                      cmp  dl,Boost_Percentage
+                      mov bl, 100
+                      call RANDOM_NUMBER
+                      cmp  ah,Boost_Percentage
                       jb   Dont_Boost
                       call Make_Boost
     Dont_Boost:       

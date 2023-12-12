@@ -36,15 +36,15 @@ main proc far
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
   ;;;;;;; TESTING COLLISION ;;;;;;
-  ;mov AX, 0
+  ;mov AX, 0001h
   ;mov CX, 25
   ;mov DX, 85
   ;call ADD_OBSTACLE
-  ;mov AX, 0
+  ;mov AX, 0202h
   ;mov CX, 5
   ;mov DX, 105
   ;call ADD_OBSTACLE
-  ;mov AX, 0
+  ;mov AX, 0401h
   ;mov CX, 5
   ;mov DX, 65
   ;call ADD_OBSTACLE
@@ -59,11 +59,10 @@ main proc far
     mov TIME_AUX, DL
   ; Else draw the new frame
   ;call Load_Track
-  ; Draw Obstacles
-  ; Draw Cars
+  ; Logic
   call MOVE_CARS
-  mov AX, 0A000h
-  mov ES, AX
+  
+  ; Draw
   call DRAW_OBSTACLES
   call DRAW_CARS
   
