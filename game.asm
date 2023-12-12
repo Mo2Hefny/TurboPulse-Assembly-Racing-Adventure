@@ -3,16 +3,19 @@
   EXTRN Load_Track:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
-  EXTRN DRAW_OBSTACLES:FAR
+  EXTRN DRAW_ENTITIES:FAR
+  EXTRN UPDATE_ENTITIES:FAR
   ; CARS.asm
   EXTRN DRAW_CARS:FAR
   EXTRN MOVE_CARS:FAR
   EXTRN LOAD_CARS:FAR
   PUBLIC TIME_AUX
+  PUBLIC TIME_SEC
 .model small
 .stack 64
-.data
+.data 
   TIME_AUX  DB 0                        ; Used when checking if time has changed.code
+  TIME_SEC  DB 0                        ; Used for updating time for games
 .code
 main proc far
 
@@ -36,15 +39,15 @@ main proc far
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
   ;;;;;;; TESTING COLLISION ;;;;;;
-  ;mov AX, 0001h
+  ;mov AX, 1
   ;mov CX, 25
   ;mov DX, 85
   ;call ADD_OBSTACLE
-  ;mov AX, 0202h
+  ;mov AX, 2
   ;mov CX, 5
   ;mov DX, 105
   ;call ADD_OBSTACLE
-  ;mov AX, 0401h
+  ;mov AX, 4
   ;mov CX, 5
   ;mov DX, 65
   ;call ADD_OBSTACLE
@@ -57,13 +60,15 @@ main proc far
     cmp DL, TIME_AUX                    ; fps = 100
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
+    mov TIME_SEC, DH
   ; Else draw the new frame
   ;call Load_Track
   ; Logic
+  call UPDATE_ENTITIES
   call MOVE_CARS
   
   ; Draw
-  call DRAW_OBSTACLES
+  call DRAW_ENTITIES
   call DRAW_CARS
   
   ; Repeat the process
