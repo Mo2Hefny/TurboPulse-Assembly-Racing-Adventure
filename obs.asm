@@ -2,6 +2,7 @@
   EXTRN TIME_SEC:BYTE
   ; PATHGEN.asm
   EXTRN RANDOM_SPAWN_POWERUP:FAR
+  EXTRN CLEAR_ENTITY:FAR
   PUBLIC ADD_OBSTACLE
   PUBLIC CHECK_COLLISION
   PUBLIC DRAW_ENTITIES
@@ -126,21 +127,22 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   ENTITY_COLLISION_LOOP:
     sub BX, 2
     call CHECK_ENTITY_COLLISION
-    cmp AX, -1
-    jz EXIT_CHECK_COLLISION
-    ;jmp CHECK_NEXT_ENTITY
-    NOT_OBSTACLE:
+    cmp AL, -1
+    jz COLLIDED
     ; Loop On The Next Obstacle
     CHECK_NEXT_ENTITY:
     cmp BX, 0
     jnz ENTITY_COLLISION_LOOP
-  or AX, -1                            ; ZF = 0 since no collision has occured
+  mov AH, 0
+  or AL, -1                            ; ZF = 0 since no collision has occured
   EXIT_CHECK_COLLISION:
+  ret
+  COLLIDED:
+  cmp AH, 0
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
 CHECK_ENTITY_COLLISION proc near
-  push BX
   mov DL, CAR_HEIGHT
   mov DH, CAR_WIDTH
   mov AL, PLAYER_DIRECTION
@@ -151,7 +153,11 @@ CHECK_ENTITY_COLLISION proc near
   mov CL, 8
   rol DX, CL                          ; ELSE DH = PH, DL = PW
   SKIP_DIMENSION_SWITCH:
-  mov BX, [ENTITIES_TYPE + BX]
+  mov AX, [ENTITIES_TYPE + BX]
+  cmp AX, 10
+  jz EXIT_CHECK_ENTITY_COLLISION
+  push BX
+  mov BX, AX
   add DL, [TYPE_WIDTH + BX]           ; Vertical: DH = W/2 + PW/2
                                       ; Horizontal: DH = W/2 + PH/2
   add DH, [TYPE_HEIGHT + BX]          ; Vertical: DL = H/2 + PH/2
@@ -191,10 +197,11 @@ CHECK_ENTITY_COLLISION proc near
   shr DL, 1
   pop AX
   cmp AX, 0
-  ;jnz NOT_OBSTACLE_COLLISION
+  jnz NOT_OBSTACLE_COLLISION
   call HANDLE_OBSTACLE_COLLISION
   jmp EXIT_CHECK_ENTITY_COLLISION
   NOT_OBSTACLE_COLLISION:
+  call HANDLE_POWER_COLLISION
   jmp EXIT_CHECK_ENTITY_COLLISION
   NO_COLLISION:
   pop AX
@@ -203,10 +210,26 @@ CHECK_ENTITY_COLLISION proc near
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
 HANDLE_OBSTACLE_COLLISION proc near
-  xor AX, AX                          ; ZF = 1 since a collision has occured
-  mov AX, -1
+  xor AH, 0                           ; AH = 0 since a collision has occured
+  mov AL, -1
   ret
 HANDLE_OBSTACLE_COLLISION endp
+;-------------------------------------------------------
+HANDLE_POWER_COLLISION proc near
+  mov CX, 10
+  mov [ENTITIES_TYPE + BX], CX
+  mov CX, [ENTITIES_X + BX]
+  mov DX, [ENTITIES_Y + BX]
+  mov BX, 7
+  call CLEAR_ENTITY
+  dec AL                              ; 0, 1, 2, 3
+  mov AH, 1
+  mov CL, AL
+  shl AH, CL                          ; 1, 2, 3, 4
+  or AL, -1
+  mov AL, -1
+  ret
+HANDLE_POWER_COLLISION endp
 ;-------------------------------------------------------
 DRAW_ENTITIES proc far
   mov AX, 0A000h

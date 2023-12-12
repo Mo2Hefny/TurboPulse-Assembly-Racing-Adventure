@@ -66,6 +66,7 @@
   CAR_MOVEMENT_DIR DB DOWN, DOWN        ; Movement Direction of player1, player2
   CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
   CAR_COLLISION DB 0, 0                         ; Acceleration Value of player1, player2
+  CAR_POWER DB 0, 0
 
           ; Release Press
   CAR1_KEYS DB 0C8h, 48h                            ; UP : 8, 7
@@ -507,12 +508,17 @@ CHECK_ENTITY_COLLISION proc near
   mov DX, [CAR_Y + BX]
   shr BX, 1
   mov AL, [CAR_IMG_DIR + BX]
+  push BX
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   jnz SKIP_COLLISION_FIX
   call FIX_COLLISION
   mov CURRENT_VELOCITY, DX
   call MOVE_CAR
   SKIP_COLLISION_FIX:
+  pop BX
+  mov AL, [CAR_POWER + BX]
+  or AL, AH
+  mov [CAR_POWER + BX], AL
   ret
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
