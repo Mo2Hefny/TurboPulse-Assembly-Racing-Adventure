@@ -732,7 +732,7 @@ DROP_OBSTACLE proc near                 ; AL: MOVEMENT_DIR
   ; HORIZONTAL WILL ADD ON CX
   cmp AL, LEFT
   jnz SKIP_DROP_LEFT
-  sub CX, CAR_HEIGHT / 2 + 3
+  add CX, CAR_HEIGHT / 2 + 3
   SKIP_DROP_LEFT:
   cmp AL, RIGHT
   jnz SKIP_DROP_RIGHT
