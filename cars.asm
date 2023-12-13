@@ -7,6 +7,7 @@
   EXTRN CLEAR_ENTITY:FAR
   EXTRN CHECK_CAR_ON_PATH:FAR
   ; OBSTACLES.asm
+  EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
   ; PUBLIC
   PUBLIC LOAD_CARS
@@ -82,7 +83,7 @@
             DB 00h    ; NONE : 0
 
   CAR1_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; UP, DOWN, RIGHT, LEFT
-  CAR1_POWERS_TIME DB 10, 10, 0, 0
+  CAR1_POWERS_TIME DB 0, 0, 0, 0
 
           ; Release Press
   CAR2_KEYS DB  39h, 39h                            ; SPACE : 10, 9
@@ -144,6 +145,7 @@ UPDATE_CAR proc near
   ; Check For Collision
   call CHECK_ENTITY_COLLISION
   call CHECK_PATH_COLLISION
+  call DROP_OBSTACLE
   call UPDATE_POWERUPS
   EXIT_UPDATE_CAR:
   ret
@@ -671,6 +673,7 @@ USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
   mov AL, [CAR_POWER + BX]              ; Store Activated Power
   cmp AL, 0
   jz EXIT_USE_POWERUP
+  mov [CAR_POWER + BX], BH
   dec AL
   mov BH, 0
   mov BL, AL
@@ -700,6 +703,46 @@ USE_SPEED_RELATED_POWERUP proc near     ; BX: CURRENT SELECTED CAR
   SKIP_SLOWING_DOWN:
   ret
 USE_SPEED_RELATED_POWERUP endp
+;-------------------------------------------------------
+DROP_OBSTACLE proc near                 ; AL: MOVEMENT_DIR
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  lea SI, CAR1_POWERS_TIME[2]          ; BOOSTS
+  cmp BX, 0
+  jz HANDLE_DROP_CAR1
+  lea SI, CAR2_POWERS_TIME[2]          ; BOOST
+  HANDLE_DROP_CAR1:
+  cmp [SI], BH
+  jz EXIT_DROP_OBSTACLE
+  mov [SI], BH
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  shr BL, 1
+  mov AL, [CAR_MOVEMENT_DIR + BX]
+  ; VERTICAL WILL ADD ON DX
+  cmp AL, UP
+  jnz SKIP_DROP_BACKWARD
+  sub DX, CAR_HEIGHT / 2 + 3
+  SKIP_DROP_BACKWARD:
+  cmp AL, DOWN
+  jnz SKIP_DROP_UPWARD
+  add DX, CAR_HEIGHT / 2 + 3
+  SKIP_DROP_UPWARD:
+  ; HORIZONTAL WILL ADD ON CX
+  cmp AL, LEFT
+  jnz SKIP_DROP_LEFT
+  sub CX, CAR_HEIGHT / 2 + 3
+  SKIP_DROP_LEFT:
+  cmp AL, RIGHT
+  jnz SKIP_DROP_RIGHT
+  sub CX, CAR_HEIGHT / 2 + 3
+  SKIP_DROP_RIGHT:
+  mov AX, 0
+  call ADD_OBSTACLE
+  EXIT_DROP_OBSTACLE:
+  ret
+DROP_OBSTACLE endp
 ;-------------------------------------------------------
 UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
   mov AL, TIME_SEC
