@@ -1,5 +1,6 @@
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
+  EXTRN TIME_SEC:BYTE
   ; PATHGEN.asm
   EXTRN xstart:WORD
   EXTRN ystart:WORD
@@ -52,6 +53,10 @@
   DOWN_LEFT EQU 5
   UP_LEFT EQU 6
   DOWN_RIGHT EQU 7
+  BOOST EQU 2
+  SLOW EQU 1
+  POWERUP_TIME EQU 5
+  POWERUPS_COUNT EQU 4
 
   ; Variables
   OLD_TIME_AUX DB 0
@@ -69,22 +74,26 @@
   CAR_POWER DB 0, 0
 
           ; Release Press
-  CAR1_KEYS DB 0C8h, 48h                            ; UP : 8, 7
+  CAR1_KEYS DB  25h, 25h                            ; K : 10, 9
+            DB 0C8h, 48h                            ; UP : 8, 7
             DB 0D0h, 50h                            ; DOWN : 6, 5
             DB 0CDh, 4Dh                            ; RIGHT : 4, 3
             DB 0CBh, 4Bh                            ; LEFT : 2, 1
             DB 00h    ; NONE : 0
 
   CAR1_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; UP, DOWN, RIGHT, LEFT
+  CAR1_POWERS_TIME DB 10, 10, 0, 0
 
           ; Release Press
-  CAR2_KEYS DB 91h, 11h                             ; W : 8, 7        [BX] + 0
-            DB 9Fh, 1Fh                             ; S : 6, 5        [BX] + 1
+  CAR2_KEYS DB  39h, 39h                            ; SPACE : 10, 9
+            DB  91h, 11h                            ; W : 8, 7        [BX] + 0
+            DB  9Fh, 1Fh                            ; S : 6, 5        [BX] + 1
             DB 0A0h, 20h                            ; D : 4, 3        [BX] + 2
-            DB 9Eh, 1Eh                             ; A : 2, 1        [BX] + 3
+            DB  9Eh, 1Eh                            ; A : 2, 1        [BX] + 3
             DB 00h    ; NONE : 0
 
   CAR2_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; W, S, D, A
+  CAR2_POWERS_TIME DB 0, 0, 0, 0
 .code
 ;-------------------------------------------------------
 MOVE_CARS proc far
@@ -135,6 +144,7 @@ UPDATE_CAR proc near
   ; Check For Collision
   call CHECK_ENTITY_COLLISION
   call CHECK_PATH_COLLISION
+  call UPDATE_POWERUPS
   EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
@@ -146,9 +156,15 @@ CHECK_INPUT_UPDATES proc near
   jz EXIT_CHECK_INPUT_UPDATES
   lea DI, CAR1_KEYS
   lea BX, CAR1_KEYS_STATUS
+  lea SI, CAR1_POWERS_TIME
+  mov AH, 0
+  mov CURRENT_CAR, AH
   call READ_BUFFER
   lea DI, CAR2_KEYS
   lea BX, CAR2_KEYS_STATUS
+  lea SI, CAR2_POWERS_TIME
+  mov AH, 2
+  mov CURRENT_CAR, AH
   call READ_BUFFER
   EXIT_CHECK_INPUT_UPDATES:
   ret
@@ -156,10 +172,15 @@ CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
 READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
   ; Check Selected Car Input
-  MOV CX, 9
+  MOV CX, 11
   repne SCASB                           ; Search for AX in CAR_KEYS
   cmp CX, 0
   jz EXIT_READ_KEYBOARD
+  cmp CX, 8
+  jng MOVEMENT_KEY
+  call USE_POWERUP
+  jmp EXIT_READ_KEYBOARD
+  MOVEMENT_KEY:
   mov DX, 8
   sub DL, CL
   sar Dl, 1
@@ -352,8 +373,8 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   SKIP_ACC_CHECKS:
   ; Position = Position + (Velocity + Boost) * Acceleration
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
+  call USE_SPEED_RELATED_POWERUP
   mov AX, [DI]
-  mov BL, CAR_SPEED
   imul BL                               ; (Velocity + Boost) * Acceleration(DX)
   ;mov DL, TIME_AUX
   ;sub DL, OLD_TIME_AUX                 ; delta(T) = New T - Old T
@@ -508,17 +529,40 @@ CHECK_ENTITY_COLLISION proc near
   mov DX, [CAR_Y + BX]
   shr BX, 1
   mov AL, [CAR_IMG_DIR + BX]
+  ; CHECK IF POWER IS USED
+  mov AH, CAR1_POWERS_TIME[3]
+  cmp BX, 0
+  jz HANDLE_PASS_CAR1
+  mov AH, CAR2_POWERS_TIME[3]
+  HANDLE_PASS_CAR1:
+  mov BH, AH
   push BX
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+  pop BX
   jnz SKIP_COLLISION_FIX
+  mov AH, BH
+  mov BH, 0
+  cmp AH, 0                             ; IF AH is 0 then the pass ability is used.
+  jz HANDLE_TIRE_COLLISION
+  ; USE THE POWER TO PASS
+  mov AH, 0
+  cmp BX, 0
+  jnz REMOVE_PASS_CAR2
+  mov CAR1_POWERS_TIME[3], AH
+  jmp EXIT_CHECK_ENTITY_COLLISION
+  REMOVE_PASS_CAR2:
+  mov CAR2_POWERS_TIME[3], AH
+  jmp EXIT_CHECK_ENTITY_COLLISION
+  HANDLE_TIRE_COLLISION:
   call FIX_COLLISION
   mov CURRENT_VELOCITY, DX
   call MOVE_CAR
+  jmp EXIT_CHECK_ENTITY_COLLISION
   SKIP_COLLISION_FIX:
-  pop BX
-  mov AL, [CAR_POWER + BX]
-  or AL, AH
-  mov [CAR_POWER + BX], AL
+  cmp AH, 0
+  jz EXIT_CHECK_ENTITY_COLLISION
+  mov [CAR_POWER + BX], AH
+  EXIT_CHECK_ENTITY_COLLISION:
   ret
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
@@ -618,6 +662,70 @@ CHECK_PATH_COLLISION proc near
   pop DI
   ret
 CHECK_PATH_COLLISION endp
+;-------------------------------------------------------
+USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
+  mov BH, 0
+  mov BL, CURRENT_CAR
+  shr BX, 1
+  mov AH, POWERUP_TIME
+  mov AL, [CAR_POWER + BX]              ; Store Activated Power
+  cmp AL, 0
+  jz EXIT_USE_POWERUP
+  dec AL
+  mov BH, 0
+  mov BL, AL
+  add SI, BX
+  mov AH, 5
+  mov [SI], AH                      ; Update Powerup Time
+  EXIT_USE_POWERUP:
+  ret
+USE_POWERUP endp
+;-------------------------------------------------------
+USE_SPEED_RELATED_POWERUP proc near     ; BX: CURRENT SELECTED CAR
+  cmp BX, 0
+  mov AH, [CAR1_POWERS_TIME]            ; BOOST
+  mov AL, CAR2_POWERS_TIME[1]           ; SLOW
+  jz HANDLE_BOOST_CAR1
+  mov AH, [CAR2_POWERS_TIME]            ; BOOST
+  mov AL, CAR1_POWERS_TIME[1]           ; SLOW
+  HANDLE_BOOST_CAR1:
+  mov BL, CAR_SPEED
+  cmp AH, 0
+  jz SKIP_ADDING_BOOST
+  add BL, BOOST
+  SKIP_ADDING_BOOST:
+  cmp AL, 0
+  jz SKIP_SLOWING_DOWN
+  sub BL, SLOW
+  SKIP_SLOWING_DOWN:
+  ret
+USE_SPEED_RELATED_POWERUP endp
+;-------------------------------------------------------
+UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
+  mov AL, TIME_SEC
+  cmp OLD_TIME_SEC, AL
+  jz EXIT_UPDATE_POWERUPS
+  mov OLD_TIME_SEC, AL
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  lea SI, CAR1_POWERS_TIME
+  cmp BL, 0
+  jz UPDATE_POWERUPS_CAR1
+  lea SI, CAR2_POWERS_TIME
+  UPDATE_POWERUPS_CAR1:
+  mov CX, POWERUPS_COUNT
+  mov AH, 1
+  mov AL, 0
+  UPDATE_POWERUPS_LOOP:
+    cmp [SI], AL
+    jz DONT_LOWER_TIMER
+    sub [SI], AH
+    DONT_LOWER_TIMER:
+    inc SI
+    loop UPDATE_POWERUPS_LOOP
+  EXIT_UPDATE_POWERUPS:
+  ret
+UPDATE_POWERUPS endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
   mov AX, 0A000h

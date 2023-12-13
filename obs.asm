@@ -72,6 +72,7 @@
   PLAYER_DIRECTION DB ?
   CURR_ENTITY_WIDTH DB ?
   CURR_ENTITY_HEIGHT DB ?
+  CAN_PASS DB ?
   CURR_TRANSPARENT_COLOR DB ?
 .code
 ;-------------------------------------------------------
@@ -117,9 +118,10 @@ RANDOM_SPAWN_ENTITY proc near
   ret
 RANDOM_SPAWN_ENTITY endp
 ;-------------------------------------------------------
-CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR
+CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR, AH: CAN PASS
                                         ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
   mov PLAYER_DIRECTION, AL
+  mov CAN_PASS, AH
   mov PLAYER_X, CX
   mov PLAYER_Y, DX
   mov BX, ENTITIES_COUNT
@@ -210,7 +212,17 @@ CHECK_ENTITY_COLLISION proc near
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
 HANDLE_OBSTACLE_COLLISION proc near
-  xor AH, 0                           ; AH = 0 since a collision has occured
+  mov AH, CAN_PASS
+  cmp AH, 0
+  jz CANT_PASS_THROUGH
+  mov CX, 10
+  mov [ENTITIES_TYPE + BX], CX
+  mov CX, [ENTITIES_X + BX]
+  mov DX, [ENTITIES_Y + BX]
+  mov BX, 5
+  call CLEAR_ENTITY
+  CANT_PASS_THROUGH:
+  xor AH, AH                           ; AH = 0 since a collision has occured
   mov AL, -1
   ret
 HANDLE_OBSTACLE_COLLISION endp
@@ -222,11 +234,7 @@ HANDLE_POWER_COLLISION proc near
   mov DX, [ENTITIES_Y + BX]
   mov BX, 7
   call CLEAR_ENTITY
-  dec AL                              ; 0, 1, 2, 3
-  mov AH, 1
-  mov CL, AL
-  shl AH, CL                          ; 1, 2, 3, 4
-  or AL, -1
+  mov AH, AL
   mov AL, -1
   ret
 HANDLE_POWER_COLLISION endp
