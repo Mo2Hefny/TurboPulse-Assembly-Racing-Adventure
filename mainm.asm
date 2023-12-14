@@ -63,6 +63,8 @@ drawImage proc                                         ;Function To Load Track F
 drawImage endp
 
 MAINMENU PROC FAR
+    push DS
+    push ES
     MOV AX,@DATA
     MOV ds,AX
 
@@ -358,7 +360,8 @@ done2:
     pop dx
     pop bx
     pop ax
-
+    pop ES
+    pop DS
     ret
 MAINMENU ENDP
 end 

@@ -32,118 +32,21 @@
   messlost db "both players lost" 
   TIME_SEC  DB 0                        ; Used for updating time for games
 .code
-jmp far ptr main
-;
-
-  ;-------------------------------------------------------
-RESET_BACKGROUND proc near
-  ; (Send to TRACK file)
-  ; Set background color to WHITE
-  mov AH, 06h                           ; Scroll up function
-  xor AL, AL                            ; Clear entire screen
-  xor CX, CX                            ; Upper left corner CH=row, CL=column
-  mov DX, 104Fh                         ; lower right corner DH=row, DL=column 
-  mov BH, 1Eh                           ; YellowOnBlue
-  int 10h
-  ret
-RESET_BACKGROUND endp
 ;-------------------------------------------------------
-
-dtime proc
-;display min
-    mov ah,2
-    mov bh,0
-    mov dh,2eh
-    mov dl,32h
-    int 10h
-    MOV dl,'0'
-    mov ah,2
-    int 21h
-    mov al,min
-    add al,30h
-    mov dl,al
-    mov ah,02
-    int 21h
-    mov dl,':'
-    mov ah,2
-    int 21H
-;display sec
-    mov bh,10
-    mov al,sec
-    mov ah,0
-    div bh
-    add al,30h
-    add ah,30h
-    mov bh,ah
-    mov dl,al
-    mov ah,02
-    int 21h
-    mov dl,Bh
-    mov ah,02
-    int 21h
-    ret
-dtime endp 
-displaynames proc
-    mov ax,@data
-    mov es,ax   
-     
-    ; p1 name 
-    mov  bh, 0    ; page.
-    lea  bp, p1name  ; offset.
-    mov  bl,01h ; default attribute.
-    mov cx,0
-    mov  cl, p1actual  ; char number.
-    mov  dl, 2h    ; col.
-    mov  dh, 15h    ; row.
-    mov  ah, 13h    ; function.
-    mov  al, 0h    ; sub-function.
-    int  10h
-
-    mov  bh, 0    ; page.
-    lea  bp, p2name  ; offset.
-    mov  bl,04h ; default attribute.
-    mov cx,0
-    mov  cl, p2actual  ; char number.
-    mov  dl, 1ah    ; col.
-    mov  dh, 15h    ; row.
-    mov  ah, 13h    ; function.
-    mov  al, 0h    ; sub-function.
-    int  10h
-
-
-
-displaynames endp
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-modify proc 
-    mov cl,sec
-    cmp cl,0
-    jz adjustmin
-    MOV currsec,dh
-    dec sec
-    call dtime
-    jmp retlabel
-adjustmin:cmp min,0
-          JZ retlabel
-          dec min
-          mov sec,60
-          call dtime
-
-retlabel:
-    ret
-modify endp
 main proc far
-  cli
-  push ds
-  mov ax,cs
-  mov ds,ax
-  mov ax,2509h
-  lea dx, CHECK_INPUT_UPDATES
-  int 21h
-  pop ds
-  sti
+  ;cli
+  ;push ds
+  ;mov ax,cs
+  ;mov ds,ax
+  ;mov ax,2509h
+  ;lea dx, CHECK_INPUT_UPDATES
+  ;int 21h
+  ;pop ds
+  ;sti  ;Generate Track
   mov AX, @data
   mov DS, AX
 
+  mov ES, AX
   ; Initialize Video Mode
   mov AX, 0013h                         ; Select 320x200, 256 color graphics
   int 10h
@@ -157,17 +60,14 @@ main proc far
   int 10h
  
   call MAINMENU
-  ;Generate Track
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
   call displaynames
-   mov AH, 2Ch                          ;initialize currentsec
-   int 21h                             
-   mov currsec,dh 
-
-
-                                       ; initialize names
-
+  mov AH, 2Ch                          ;initialize currentsec
+  int 21h                             
+  mov currsec,dh 
+  
+  ; [DS: DX]
   ; ;;;;;; TESTING COLLISION ;;;;;;
   ; mov AX, 0
   ; mov CX, 25
@@ -184,7 +84,6 @@ main proc far
 
   ;Get the systen time
   CHECK_TIME:
-    
     mov AH, 2Ch
     int 21h                             ; CH = hour CL = minute DH - second DL = 1/100 seconds
     cmp currsec,dh
@@ -226,4 +125,89 @@ terminate:
   mov ax,4ch
   int 21H
 main endp
+;-------------------------------------------------------
+modify proc near
+    mov cl,sec
+    cmp cl,0
+    jz adjustmin
+    MOV currsec,dh
+    dec sec
+    call dtime
+    jmp retlabel
+adjustmin:cmp min,0
+          JZ retlabel
+          dec min
+          mov sec,60
+          call dtime
+
+retlabel:
+    ret
+modify endp
+;-------------------------------------------------------
+dtime proc near
+;display min
+    mov ah,2
+    mov bh,0
+    mov dh,2eh
+    mov dl,32h
+    int 10h
+    MOV dl,'0'
+    mov ah,2
+    int 21h
+    mov al,min
+    add al,30h
+    mov dl,al
+    mov ah,02
+    int 21h
+    mov dl,':'
+    mov ah,2
+    int 21H
+;display sec
+    mov bh,10
+    mov al,sec
+    mov ah,0
+    div bh
+    add al,30h
+    add ah,30h
+    mov bh,ah
+    mov dl,al
+    mov ah,02
+    int 21h
+    mov dl,Bh
+    mov ah,02
+    int 21h
+    ret
+dtime endp 
+;-------------------------------------------------------
+displaynames proc near
+    push BP
+    mov ax,@data
+    mov es,ax   
+     
+    ; p1 name 
+    mov  bh, 0    ; page.
+    lea  bp, p1name  ; offset.
+    mov  bl,01h ; default attribute.
+    mov cx,0
+    mov  cl, p1actual  ; char number.
+    mov  dl, 2h    ; col.
+    mov  dh, 15h    ; row.
+    mov  ah, 13h    ; function.
+    mov  al, 0h    ; sub-function.
+    int  10h
+
+    mov  bh, 0    ; page.
+    lea  bp, p2name  ; offset.
+    mov  bl,04h ; default attribute.
+    mov cx,0
+    mov  cl, p2actual  ; char number.
+    mov  dl, 1ah    ; col.
+    mov  dh, 15h    ; row.
+    mov  ah, 13h    ; function.
+    mov  al, 0h    ; sub-function.
+    int  10h
+    pop BP
+    ret
+displaynames endp
+;-------------------------------------------------------
 end main
