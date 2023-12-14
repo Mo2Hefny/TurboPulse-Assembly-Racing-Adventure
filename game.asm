@@ -3,9 +3,12 @@
   EXTRN Load_Track:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
-  EXTRN DRAW_OBSTACLES:FAR
+  EXTRN DRAW_ENTITIES:FAR
+  EXTRN UPDATE_ENTITIES:FAR
   ; CARS.asm
+  EXTRN CHECK_INPUT_UPDATES:FAR
   EXTRN DRAW_CARS:FAR
+  EXTRN PRINT_TEST:FAR
   EXTRN MOVE_CARS:FAR
   EXTRN LOAD_CARS:FAR
   ;mainmenu.asm
@@ -18,14 +21,16 @@
   EXTRN ALLLOST:FAR
 
   PUBLIC TIME_AUX
+  PUBLIC TIME_SEC
 .model huge
 .stack 64
-.data
+.data 
   TIME_AUX  DB 0                        ; Used when checking if time has changed.code
   min db 0
   sec db 10
   currsec db ?
   messlost db "both players lost" 
+  TIME_SEC  DB 0                        ; Used for updating time for games
 .code
 jmp far ptr main
 ;
@@ -127,7 +132,15 @@ retlabel:
     ret
 modify endp
 main proc far
-
+  cli
+  push ds
+  mov ax,cs
+  mov ds,ax
+  mov ax,2509h
+  lea dx, CHECK_INPUT_UPDATES
+  int 21h
+  pop ds
+  sti
   mov AX, @data
   mov DS, AX
 
@@ -185,14 +198,14 @@ skipcheck:
     cmp DL, TIME_AUX                    ; fps = 100
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
-  ; Else draw the new frame
-  ;call Load_Track
-  ; Draw Obstacles
-  ; Draw Cars
+    mov TIME_SEC, DH
+  ; Logic
+  ;call PRINT_TEST
+  call UPDATE_ENTITIES
   call MOVE_CARS
-  mov AX, 0A000h
-  mov ES, AX
-  call DRAW_OBSTACLES
+  
+  ; Draw
+  call DRAW_ENTITIES
   call DRAW_CARS
   
   ; Repeat the process

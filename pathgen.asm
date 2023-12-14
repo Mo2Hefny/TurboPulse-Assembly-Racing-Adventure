@@ -1,9 +1,10 @@
     PUBLIC TRACK
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
-    EXTRN OBSTACLES_COUNT:WORD
+    EXTRN ENTITIES_COUNT:WORD
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
+    PUBLIC RANDOM_SPAWN_POWERUP
     PUBLIC CLEAR_ENTITY
     PUBLIC CHECK_CAR_ON_PATH
     PUBLIC xstart
@@ -32,7 +33,6 @@
     FINISH EQU 4
 
     direction        db ?                ; the randomized direction
-    ENTITIES_COUNT   db 0
 
     pathlength       dw 0                ;Current length of the track
     minpathlength    dw 40               ;MinPath Length Before Restarting
@@ -47,9 +47,9 @@
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 64000 DUP (?)    ;To save and Load Track
-    Block_Percentage db 10               ;real Percentage
+    Block_Percentage db 30               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 30               ;100-this Percentage so if 90 its 10
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
     ;;;;;;;;;;;;;;;; done
@@ -167,6 +167,15 @@ Load_Track proc                                         ;Function To Load Track 
                       ret
 Load_Track endp
 ;-------------------------------------------------------
+GET_RANDOM_INDEX proc near      ; BL: number of indexes, BH: multiply
+ call RANDOM_NUMBER
+ mov al, ah
+ mov ah, 0
+ mov bl, bh
+ mul bl
+ ret
+GET_RANDOM_INDEX endp
+;-------------------------------------------------------
 RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
     push cx
     push dx
@@ -177,6 +186,8 @@ RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
     add al, prev_rand
     mov cl, dh
     ror al, cl
+    ;mov cx, CURR_Y
+    ;ror al, cl
     mov prev_rand, al
     div  bl
     pop dx
@@ -208,32 +219,63 @@ random_direction proc
                       ret
 random_direction endp
 ;-------------------------------------------------------
-PATH_BLOCK proc                                         ;Draw Brown (06h) Square to Represent Path Block
+RANDOM_SPAWN_POWERUP proc far
+  RANDOM_SPAWN_LOOP:
+  mov CX, 0
+  mov DX, 0
+  mov BL, GAME_BORDER_X_MAX / BLOCK_WIDTH
+  mov BH, BLOCK_WIDTH
+  call GET_RANDOM_INDEX             ; 16 options, mul by 20
+  add CX, AX
+  mov BL, GAME_BORDER_Y_MAX / BLOCK_HEIGHT
+  mov BH, BLOCK_HEIGHT
+  call GET_RANDOM_INDEX             ; 16 options, mul by 20
+  add DX, AX
+  ; CHECK IF AVAILABLE
+  mov AH, 0Dh
+  int 10h
+  cmp AL, GREY
+  jnz RANDOM_SPAWN_LOOP
+  call SPAWN_POWERUP
+  ret
+RANDOM_SPAWN_POWERUP endp
+;-------------------------------------------------------
+SPAWN_POWERUP proc near
+  mov bx, 0503h
+  call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                    ; 0, 5, 10
+  add ax, 5                         ; 5, 10, 15
+  add cx, ax
+  mov bx, 0503h
+  call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                    ; 0, 5, 10
+  add ax, 5                         ; 5, 10, 15
+  add dx, ax
+  mov bl, 4                         ; 4 options
+  CALL RANDOM_NUMBER
+  mov al, ah
+  inc al
+  call ADD_OBSTACLE
+  ret
+SPAWN_POWERUP endp
+;-------------------------------------------------------
+PATH_BLOCK proc near                                        ;Draw Brown (06h) Square to Represent Path Block
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
                       mov cx, CURR_X
                       mov dx, CURR_Y
-                      mov bx, 4
-                      call RANDOM_NUMBER
-                      mov al, ah
-                      mov ah, 0
-                      mov bx, 5
-                      mul bl
-                      add ax, 2
-                      add cx, ax                        ; 0, 5, 10, 15
-                      mov  bl, 4
-                      call RANDOM_NUMBER
-                      mov al, ah
-                      mov ah, 0
-                      mov bx, 5
-                      mul bl
-                      add ax, 2
-                      add dx, ax                        ; 0, 5, 10, 15
-                      mov AH, ENTITIES_COUNT
+                      mov bx, 0504h
+                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
+                                                        ; 0, 5, 10, 15
+                      add ax, 2                         ; 2, 7, 12, 17
+                      add cx, ax
+                      mov bx, 0504h
+                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
+                                                        ; 0, 5, 10, 15
+                      add ax, 2                         ; 2, 7, 12, 17
+                      add dx, ax
                       mov AL, 0
-                      inc ENTITIES_COUNT
-                      inc ENTITIES_COUNT
                       call ADD_OBSTACLE
                       pop  di                           ;3
                       pop  bx                           ;2
@@ -241,55 +283,20 @@ PATH_BLOCK proc                                         ;Draw Brown (06h) Square
                       ret
 PATH_BLOCK endp
 ;-------------------------------------------------------
-Make_Boost PROC                                         ;Draw Boost
+Make_Boost PROC near                                       ;Draw Boost
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov  cx,CURR_X
-                      mov  dx,CURR_Y
-                      CALL random_direction
-                      CMP  direction, UP                 ; Blue boost  1
-                      Jz   Blue
-                      CMP  direction, DOWN                 ; Yellow boost E
-                      Jz   Yellow
-                      CMP  direction, LEFT                 ; Magenta boost D
-                      JZ   Magenta
-                      CMP  direction, RIGHT                  ; Cyan boost C
-                      JZ   Cyan
-    Blue:             mov  ax,0C01h
-                      JMP  CONT_BOOST
-    Yellow:           mov  ax,0C0Eh
-                      JMP  CONT_BOOST
-    Magenta:          mov  ax,0C0Dh
-                      JMP  CONT_BOOST
-    Cyan:             mov  ax,0C03h
-    CONT_BOOST:       
-                      add  cx,2
-                      add  dx,2
-                      mov  bx,cx
-                      add  bx,Block_SIZE
-                      mov  di,dx
-                      add  di,Block_SIZE
-    roW7:             int  10h
-                      inc  cx
-                      cmp  cx,bx
-                      jz   column7
-                      jmp  row7
-    column7:          
-                      sub  cx,Block_SIZE
-                      inc  dx
-                      cmp  dx,di
-                      jz   exit7
-                      jmp  row7
-    exit7:            
-                      sub  dx,Block_SIZE
+                      mov cx, CURR_X
+                      mov dx, CURR_Y
+                      call SPAWN_POWERUP
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1
                       ret
 Make_Boost ENDP
 ;-------------------------------------------------------
-draw_square PROC                                        ;Draw A gray Square to Represnt Our beautiful Track
+draw_square PROC near                                        ;Draw A gray Square to Represnt Our beautiful Track
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
@@ -320,20 +327,20 @@ draw_square PROC                                        ;Draw A gray Square to R
                       jz   exit
                       jmp  row
     exit:             
-                      sub  dx, BLOCK_HEIGHT
                       mov dx, CURR_BLOCK
                       cmp dx, 2
                       jng Dont_Boost
-                      mov  ah, 2ch
-                      int  21h
-                      ;cmp  dl,Block_Percentage
-                      and dl, prev_rand
-                      cmp  dl,Block_Percentage
+                      mov bl, 100
+                      call RANDOM_NUMBER
+                      cmp  ah,Block_Percentage
                       ja   Dont_block
                       call PATH_BLOCK
+                      jmp Dont_Boost
     Dont_block:       
-                      cmp  dl,Boost_Percentage
-                      jb   Dont_Boost
+                      mov bl, 100
+                      call RANDOM_NUMBER
+                      cmp  ah,Boost_Percentage
+                      ja   Dont_Boost
                       call Make_Boost
     Dont_Boost:       
                       pop  di                           ;3
@@ -352,17 +359,16 @@ GENERATE_TRACK proc far
 
 
     restart:                                            ;Restart Only if less than MinPathLength
-                      mov dx, CURR_BLOCK
-                      mov CURR_BLOCK, 0
-                      mov ENTITIES_COUNT, 0
                       push ax
                       mov  ax,minpathlength
                       cmp  pathlength,ax
                       pop  AX
                       jb   extra1
-                      mov CURR_BLOCK, dx
                       jmp  far ptr Terminate_Program
     extra1:           
+                      mov CURR_BLOCK, 0
+                      mov ah, -1
+                      call ADD_OBSTACLE
                       call RESET_BACKGROUND             ;Resest Our Green BackGround
                       mov  cx,xstart
                       mov  dx,ystart
