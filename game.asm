@@ -1,23 +1,37 @@
+  ; PATHGEN.asm
+  EXTRN GENERATE_TRACK:FAR
+  EXTRN Load_Track:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
-  EXTRN DRAW_OBSTACLES:FAR
+  EXTRN DRAW_ENTITIES:FAR
+  EXTRN UPDATE_ENTITIES:FAR
   ; CARS.asm
+  EXTRN CHECK_INPUT_UPDATES:FAR
   EXTRN DRAW_CARS:FAR
+  EXTRN PRINT_TEST:FAR
   EXTRN MOVE_CARS:FAR
+  EXTRN LOAD_CARS:FAR
   PUBLIC TIME_AUX
+  PUBLIC TIME_SEC
 .model small
 .stack 64
-.data
+.data 
   TIME_AUX  DB 0                        ; Used when checking if time has changed.code
+  TIME_SEC  DB 0                        ; Used for updating time for games
 .code
 main proc far
-
+  cli
+  push ds
+  mov ax,cs
+  mov ds,ax
+  mov ax,2509h
+  lea dx, CHECK_INPUT_UPDATES
+  int 21h
+  pop ds
+  sti
   mov AX, @data
   mov DS, AX
-
-  mov AX, 0A000h
   mov ES, AX
-
   ; Initialize Video Mode
   mov AX, 0013h                         ; Select 320x200, 256 color graphics
   int 10h
@@ -29,39 +43,46 @@ main proc far
   mov BX, 0000h                         ; 00h Background intensity enabled
                                         ; 01h Blink enabled
   int 10h
-
+  ; Generate Track
+  call GENERATE_TRACK                   ; Return Starting Direction in AL
+  call LOAD_CARS
   ;;;;;;; TESTING COLLISION ;;;;;;
-  mov AX, 0
-  mov CX, 0Ah
-  mov DX, 3Ah
-  call ADD_OBSTACLE
-  mov AX, 0
-  mov CX, 2Fh
-  mov DX, 3Ah
-  call ADD_OBSTACLE
+  ;mov AX, 1
+  ;mov CX, 25
+  ;mov DX, 85
+  ;call ADD_OBSTACLE
+  ;mov AX, 2
+  ;mov CX, 5
+  ;mov DX, 105
+  ;call ADD_OBSTACLE
+  ;mov AX, 4
+  ;mov CX, 5
+  ;mov DX, 65
+  ;call ADD_OBSTACLE
 
   ; Get the systen time
   CHECK_TIME:
+    
     mov AH, 2Ch
     int 21h                             ; CH = hour CL = minute DH - second DL = 1/100 seconds
     cmp DL, TIME_AUX                    ; fps = 100
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
-  ; Else draw the new frame
-  call RESET_BACKGROUND
-  ; Draw Obstacles
-  call DRAW_OBSTACLES
-  ; Draw Cars
+    mov TIME_SEC, DH
+  ; Logic
+  ;call PRINT_TEST
+  call UPDATE_ENTITIES
   call MOVE_CARS
-  mov AX, 0A000h
-  mov ES, AX
+  
+  ; Draw
+  call DRAW_ENTITIES
   call DRAW_CARS
   
   ; Repeat the process
   jmp CHECK_TIME
 
   ; Terminate Program
-  mov ah, 9
+  mov ah, 4Ch
   int 21h
 
 main endp
