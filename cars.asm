@@ -10,11 +10,19 @@
   EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
   ; PUBLIC
+  PUBLIC CHECK_INPUT_UPDATES
+  PUBLIC PRINT_TEST
   PUBLIC LOAD_CARS
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
   PUBLIC CAR_X
   PUBLIC CAR_Y
+  moveCursor macro x, y
+    mov dl, x
+    mov dh, y
+    mov ah, 2H
+    int 10h  
+endm
 .model small
 .data
   ; Red Car
@@ -101,26 +109,14 @@ MOVE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
-
-  ; Check Keyboard
-  call CHECK_INPUT_UPDATES
-
   ; Player One
   mov AL, 0
   mov CURRENT_CAR, AL
   call UPDATE_CAR
-
-  ; Check Keyboard
-  call CHECK_INPUT_UPDATES
-
   ; Player Two
   mov AL, 2
   mov CURRENT_CAR, AL
   call UPDATE_CAR
-
-  ; reset Keyboard Buffer
-  mov AH, 04h
-  int 16h
 
   EXIT_MOVE_CARS:
   mov AL, TIME_AUX
@@ -151,9 +147,16 @@ UPDATE_CAR proc near
   ret
 UPDATE_CAR endp
 ;-------------------------------------------------------
-CHECK_INPUT_UPDATES proc near
-  mov ax, 0
-  in AL, 60h
+CHECK_INPUT_UPDATES proc far
+  push AX
+  push BX
+  push CX
+  push DX
+  push SI
+  push DI
+  push DS
+  push ES
+  in al, 60h ; read scan code
   cmp AL, 0
   jz EXIT_CHECK_INPUT_UPDATES
   lea DI, CAR1_KEYS
@@ -169,7 +172,17 @@ CHECK_INPUT_UPDATES proc near
   mov CURRENT_CAR, AH
   call READ_BUFFER
   EXIT_CHECK_INPUT_UPDATES:
-  ret
+  mov al,20h
+  out 20h,al
+  pop ES
+  pop DS
+  pop DI
+  pop SI
+  pop DX
+  pop CX
+  pop BX
+  pop AX
+  iret
 CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
 READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
@@ -771,6 +784,7 @@ UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
 UPDATE_POWERUPS endp
 ;-------------------------------------------------------
 DRAW_CARS proc far
+  push ES
   mov AX, 0A000h
   mov ES, AX
   mov CX, CAR_X                        ; Set initial column (X)
@@ -788,6 +802,7 @@ DRAW_CARS proc far
   lea SI, img2                          ; Load image adress
   mov BL, CAR_IMG_DIR + 1                  ; Set Face Direction
   call DRAW_CAR
+  pop ES
   ret
 DRAW_CARS endp
 ;-------------------------------------------------------
@@ -930,4 +945,60 @@ LOAD_CARS proc far                      ; AL: Start Direction
   ret
 LOAD_CARS endp
 ;-------------------------------------------------------;
+PRINT_TEST proc far
+moveCursor 0CH, 0AH
+    mov ah, 2h
+    mov dl, CAR1_KEYS_STATUS
+    add dl, '0'
+    int 21H
+    moveCursor 0FH, 0AH
+    mov dl, CAR1_KEYS_STATUS[1]
+    add dl, '0'
+    int 21H
+    moveCursor 012H, 0AH
+    mov dl, CAR1_KEYS_STATUS[2]
+    add dl, '0'
+    int 21H
+    moveCursor 015H, 0AH
+    mov dl, CAR1_KEYS_STATUS[3]
+    add dl, '0'
+    int 21H
+    moveCursor 0CH, 0FH
+    mov ah, 2h
+    mov dl, CAR2_KEYS_STATUS
+    add dl, '0'
+    int 21H
+    moveCursor 0FH, 0FH
+    mov dl, CAR2_KEYS_STATUS[1]
+    add dl, '0'
+    int 21H
+    moveCursor 012H, 0FH
+    mov dl, CAR2_KEYS_STATUS[2]
+    add dl, '0'
+    int 21H
+    moveCursor 015H, 0FH
+    mov dl, CAR2_KEYS_STATUS[3]
+    add dl, '0'
+    int 21H
+
+    moveCursor 0CH, 02H
+    mov ah, 2h
+    mov dl, CAR_MOVEMENT_DIR
+    add dl, '0'
+    int 21H
+    moveCursor 0FH, 02H
+    mov dl, CAR_IMG_DIR
+    add dl, '0'
+    int 21H
+    moveCursor 012H, 02H
+    mov dl, CAR_MOVEMENT_DIR[1]
+    add dl, '0'
+    int 21H
+    moveCursor 015H, 02H
+    mov dl, CAR_IMG_DIR[1]
+    add dl, '0'
+    int 21H
+
+ret
+PRINT_TEST endp
 end

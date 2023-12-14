@@ -6,7 +6,9 @@
   EXTRN DRAW_ENTITIES:FAR
   EXTRN UPDATE_ENTITIES:FAR
   ; CARS.asm
+  EXTRN CHECK_INPUT_UPDATES:FAR
   EXTRN DRAW_CARS:FAR
+  EXTRN PRINT_TEST:FAR
   EXTRN MOVE_CARS:FAR
   EXTRN LOAD_CARS:FAR
   PUBLIC TIME_AUX
@@ -18,11 +20,17 @@
   TIME_SEC  DB 0                        ; Used for updating time for games
 .code
 main proc far
-
+  cli
+  push ds
+  mov ax,cs
+  mov ds,ax
+  mov ax,2509h
+  lea dx, CHECK_INPUT_UPDATES
+  int 21h
+  pop ds
+  sti
   mov AX, @data
   mov DS, AX
-
-  mov AX, 0A000h
   mov ES, AX
   ; Initialize Video Mode
   mov AX, 0013h                         ; Select 320x200, 256 color graphics
@@ -61,9 +69,8 @@ main proc far
     je  CHECK_TIME                      ; repeat till time frame changes
     mov TIME_AUX, DL
     mov TIME_SEC, DH
-  ; Else draw the new frame
-  ;call Load_Track
   ; Logic
+  ;call PRINT_TEST
   call UPDATE_ENTITIES
   call MOVE_CARS
   

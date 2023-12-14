@@ -240,8 +240,6 @@ HANDLE_POWER_COLLISION proc near
 HANDLE_POWER_COLLISION endp
 ;-------------------------------------------------------
 DRAW_ENTITIES proc far
-  mov AX, 0A000h
-  mov ES, AX
   mov BX, ENTITIES_COUNT
   cmp BX, 0
   jz EXIT_DRAW_ENTITIES
