@@ -118,6 +118,7 @@ MOVE_CARS proc far
   mov CURRENT_CAR, AL
   call UPDATE_CAR
 
+  call UPDATE_POWERUPS
   EXIT_MOVE_CARS:
   mov AL, TIME_AUX
   mov OLD_TIME_AUX, AL
@@ -142,7 +143,6 @@ UPDATE_CAR proc near
   call CHECK_ENTITY_COLLISION
   call CHECK_PATH_COLLISION
   call DROP_OBSTACLE
-  call UPDATE_POWERUPS
   EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
@@ -765,10 +765,6 @@ UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
   xor BX, BX
   mov BL, CURRENT_CAR
   lea SI, CAR1_POWERS_TIME
-  cmp BL, 0
-  jz UPDATE_POWERUPS_CAR1
-  lea SI, CAR2_POWERS_TIME
-  UPDATE_POWERUPS_CAR1:
   mov CX, POWERUPS_COUNT
   mov AH, 1
   mov AL, 0
@@ -779,6 +775,15 @@ UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
     DONT_LOWER_TIMER:
     inc SI
     loop UPDATE_POWERUPS_LOOP
+  lea SI, CAR2_POWERS_TIME
+  mov CX, POWERUPS_COUNT
+  UPDATE_POWERUPS_LOOP_2:
+    cmp [SI], AL
+    jz DONT_LOWER_TIMER_2
+    sub [SI], AH
+    DONT_LOWER_TIMER_2:
+    inc SI
+    loop UPDATE_POWERUPS_LOOP_2
   EXIT_UPDATE_POWERUPS:
   ret
 UPDATE_POWERUPS endp
@@ -948,46 +953,46 @@ LOAD_CARS endp
 PRINT_TEST proc far
 moveCursor 0CH, 0AH
     mov ah, 2h
-    mov dl, CAR1_KEYS_STATUS
+    mov dl, CAR1_POWERS_TIME
     add dl, '0'
     int 21H
     moveCursor 0FH, 0AH
-    mov dl, CAR1_KEYS_STATUS[1]
+    mov dl, CAR1_POWERS_TIME[1]
     add dl, '0'
     int 21H
     moveCursor 012H, 0AH
-    mov dl, CAR1_KEYS_STATUS[2]
+    mov dl, CAR1_POWERS_TIME[2]
     add dl, '0'
     int 21H
     moveCursor 015H, 0AH
-    mov dl, CAR1_KEYS_STATUS[3]
+    mov dl, CAR1_POWERS_TIME[3]
     add dl, '0'
     int 21H
     moveCursor 0CH, 0FH
     mov ah, 2h
-    mov dl, CAR2_KEYS_STATUS
+    mov dl, CAR2_POWERS_TIME
     add dl, '0'
     int 21H
     moveCursor 0FH, 0FH
-    mov dl, CAR2_KEYS_STATUS[1]
+    mov dl, CAR2_POWERS_TIME[1]
     add dl, '0'
     int 21H
     moveCursor 012H, 0FH
-    mov dl, CAR2_KEYS_STATUS[2]
+    mov dl, CAR2_POWERS_TIME[2]
     add dl, '0'
     int 21H
     moveCursor 015H, 0FH
-    mov dl, CAR2_KEYS_STATUS[3]
+    mov dl, CAR2_POWERS_TIME[3]
     add dl, '0'
     int 21H
 
     moveCursor 0CH, 02H
     mov ah, 2h
-    mov dl, CAR_MOVEMENT_DIR
+    mov dl, CAR_POWER
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, CAR_IMG_DIR
+    mov dl, CAR_POWER[1]
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
