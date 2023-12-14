@@ -1,3 +1,4 @@
+    PUBLIC TRACK
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
     EXTRN OBSTACLES_COUNT:WORD
@@ -7,7 +8,7 @@
     PUBLIC CHECK_CAR_ON_PATH
     PUBLIC xstart
     PUBLIC ystart
-.model medium
+.model huge
 .stack 64
 .data
     ; Constants
@@ -45,7 +46,7 @@
     prev_rand        db 0
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
-    TRACK            DB 57800 DUP (?)    ;To save and Load Track
+    TRACK            DB 64000 DUP (?)    ;To save and Load Track
     Block_Percentage db 10               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 90               ;100-this Percentage so if 90 its 10
@@ -108,8 +109,12 @@ RESET_BACKGROUND proc
                       mov  AH, 06h                      ; Scroll up function
                       xor  AL, AL                       ; Clear entire screen
                       xor  CX, CX                       ; Upper left corner CH=row, CL=column
-                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  DX, 134Fh                    ; lower right corner DH=row, DL=column
                       mov  BH, GREEN                      ; Green-BackGround
+                      int  10h
+                      mov  CX,1400h                       ; Upper left corner CH=row, CL=column
+                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  BH, 00h                      ; Green-BackGround
                       int  10h
                       ret
 RESET_BACKGROUND endp
