@@ -22,27 +22,17 @@
 
   PUBLIC TIME_AUX
   PUBLIC TIME_SEC
-.model huge
+.model small
 .stack 64
 .data 
   TIME_AUX  DB 0                        ; Used when checking if time has changed.code
   min db 0
   sec db 10
-  currsec db ?
   messlost db "both players lost" 
   TIME_SEC  DB 0                        ; Used for updating time for games
 .code
 ;-------------------------------------------------------
 main proc far
-  ;cli
-  ;push ds
-  ;mov ax,cs
-  ;mov ds,ax
-  ;mov ax,2509h
-  ;lea dx, CHECK_INPUT_UPDATES
-  ;int 21h
-  ;pop ds
-  ;sti  ;Generate Track
   mov AX, @data
   mov DS, AX
 
@@ -60,14 +50,24 @@ main proc far
   int 10h
  
   call MAINMENU
+  cli
+  push ds
+  mov ax,cs
+  mov ds,ax
+  mov ax,2509h
+  lea dx, CHECK_INPUT_UPDATES
+  int 21h
+  pop ds
+  sti  ;Generate Track
+  mov AX, @data
+  mov DS, AX
   call GENERATE_TRACK                   ; Return Starting Direction in AL
   call LOAD_CARS
   call displaynames
   mov AH, 2Ch                          ;initialize currentsec
   int 21h                             
-  mov currsec,dh 
+  mov TIME_SEC,dh 
   
-  ; [DS: DX]
   ; ;;;;;; TESTING COLLISION ;;;;;;
   ; mov AX, 0
   ; mov CX, 25
@@ -86,18 +86,18 @@ main proc far
   CHECK_TIME:
     mov AH, 2Ch
     int 21h                             ; CH = hour CL = minute DH - second DL = 1/100 seconds
-    cmp currsec,dh
+    cmp DL, TIME_AUX                    ; fps = 100
+    je  CHECK_TIME                      ; repeat till time frame changes
+    mov TIME_AUX, DL
+    ; CHECK IF SECOND HAS CHANGED
+    cmp TIME_SEC, DH
     jz skipcheck 
     call modify
     cmp  min,0
     jnz skipcheck
     cmp sec,0
     jz terminate
-skipcheck:
-    cmp DL, TIME_AUX                    ; fps = 100
-    je  CHECK_TIME                      ; repeat till time frame changes
-    mov TIME_AUX, DL
-    mov TIME_SEC, DH
+    skipcheck:
   ; Logic
   ;call PRINT_TEST
   call UPDATE_ENTITIES
@@ -130,7 +130,7 @@ modify proc near
     mov cl,sec
     cmp cl,0
     jz adjustmin
-    MOV currsec,dh
+    MOV TIME_SEC,dh
     dec sec
     call dtime
     jmp retlabel
