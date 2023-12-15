@@ -10,7 +10,7 @@
 .model small
 .data
   ; Constants
-  RANDOM_SPAWN EQU 5               ; The width of all cars
+  RANDOM_SPAWN EQU 2               ; The width of all cars
   CAR_WIDTH EQU 05h               ; The width of all cars
   CAR_HEIGHT EQU 09h               ; The height of all cars
   UP EQU 0
@@ -26,13 +26,13 @@
   MAX_ENTITIES_NUM EQU 100
   OLD_TIME_SEC DB 0
   RANDOM_SPAWN_TIME DB RANDOM_SPAWN
-  TYPE_WIDTH  DB 5, 5, 5, 5, 5
-  TYPE_HEIGHT DB 5, 5, 5, 5, 5
-  TIRE_IMG        DB  0,  0,  0,  0,  0 
-                  DB  0,  0,  0,  0,  0 
-                  DB  0,  0, 15,  0,  0
-                  DB  0,  0,  0,  0,  0 
-                  DB   0,  0,  0,  0,  0 
+  TYPE_WIDTH  DB 5, 5, 5, 5, 5, 5
+  TYPE_HEIGHT DB 5, 5, 5, 5, 5, 5
+  TIRE_IMG        DB   0,   0,   0,   0,   0 
+                  DB   0,   0,   0,   0,   0 
+                  DB   0,   0, 1Fh,   0,   0
+                  DB   0,   0,   0,   0,   0 
+                  DB   0,   0,   0,   0,   0 
   SPEED_BOOST_IMG DB 2Bh, 2Bh, 2Ch, 2Bh, 2Bh
                   DB 2Bh, 2Ch, 2Ch, 2Ch, 2Bh
                   DB 2Ch, 2Ch, 2Ch, 2Ch, 2Ch
@@ -83,7 +83,7 @@ ADD_OBSTACLE proc far                   ; CX: OBSTACLE_X, DX: OBSTACLE_Y, AX: Ty
   DONT_RESET_COUNT:
   mov BX, ENTITIES_COUNT
   cmp BL, MAX_ENTITIES_NUM
-  jz EXIT_ADD_OBSTACLE
+  jnl EXIT_ADD_OBSTACLE
   mov AH, 0
   jnl EXIT_ADD_OBSTACLE
   mov ENTITIES_X[BX], CX
@@ -272,6 +272,11 @@ DRAW_ENTITIES proc far
     call DRAW_PASS_OBSTACLE
     jmp EXIT_DRAW_ENTITIES
     SKIP_PASS_OBSTACLE:
+    cmp AX, 5                           ; TYPE 0: Obstacle
+    jnz SKIP_ROCKET
+    call DRAW_ROCKET
+    jmp EXIT_DRAW_ENTITIES
+    SKIP_ROCKET:
 
     EXIT_DRAW_ENTITIES:
     ; Loop On The Next Obstacle
@@ -359,6 +364,22 @@ DRAW_PASS_OBSTACLE proc near
   pop BX
   ret
 DRAW_PASS_OBSTACLE endp
+;-------------------------------------------------------
+DRAW_ROCKET proc near
+  push BX
+  push AX
+  mov AL, TYPE_WIDTH[5]
+  mov AH, TYPE_HEIGHT[5]
+  mov CURR_ENTITY_WIDTH, AL
+  mov CURR_ENTITY_HEIGHT, AH
+  mov AL, 0
+  mov CURR_TRANSPARENT_COLOR, AL
+  lea SI, ROCKET_IMG
+  call DRAW_SELECTED_ENTITY
+  pop AX
+  pop BX
+  ret
+DRAW_ROCKET endp
 ;-------------------------------------------------------
 DRAW_SELECTED_ENTITY proc near
   ; Send coordinates to top left corner
