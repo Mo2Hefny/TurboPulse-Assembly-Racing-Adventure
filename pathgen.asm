@@ -21,6 +21,8 @@
     SCREEN_HEIGHT         EQU 200
     BLOCK_WIDTH           EQU 20
     BLOCK_HEIGHT          EQU 20
+    GRID_WIDTH            EQU GAME_BORDER_X_MAX / BLOCK_WIDTH
+    GRID_HEIGHT           EQU GAME_BORDER_Y_MAX / BLOCK_HEIGHT
     WHITE_STRIP_WIDTH     EQU 1
     WHITE_STRIP_HEIGHT    EQU 4
     GREY                  EQU 08h
@@ -40,8 +42,9 @@
 
     xstart           dw 0                ; starting indeces
     ystart           dw 80
-    CURR_X            dw ?                ;Current pntY
-    CURR_Y            dw ?                ;Current pntX
+    GRID_INDEX       DW 40h              ; 10h each row, 8 rows
+    CURR_X           dw ?                ;Current pntY
+    CURR_Y           dw ?                ;Current pntX
     max_rand         dw 25               ;Max Trials To Draw Before Restart
     curr_rand        dw 0                ;Current Trials to Draw
     prev_rand        db 0
@@ -51,12 +54,15 @@
     Block_Percentage db 30               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 30               ;100-this Percentage so if 90 its 10
+    GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
+    GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
     ;;;;;;;;;;;;;;;; done
 
 .code
 ;-------------------------------------------------------
+;-------------------- CLEANING ------------------------;
 CLEAR_ENTITY proc far                                   ; CX: centerX of entity, DX: centerY of entity, BX: dimension
     push SI
     push DI
@@ -104,7 +110,39 @@ CLEAR_ENTITY proc far                                   ; CX: centerX of entity,
     ret
 CLEAR_ENTITY endp
 ;-------------------------------------------------------
-RESET_BACKGROUND proc
+RESET_TRACK proc near
+    push AX
+    push BX
+    push CX
+    push DX
+    push DI
+    push ES
+    push DS
+    ; Reset grid
+    mov AX, @data
+    mov ES, AX
+    lea DI, GRID
+    mov CX, GRID_SIZE / 2
+    mov AX, -1
+    REP STOSW
+    ; RESET COUNTERS
+    mov CURR_BLOCK, 0
+    mov  pathlength,1
+    mov  curr_rand,0
+    mov ah, -1
+    call ADD_OBSTACLE
+    call RANDOMIZE_START
+    pop DS
+    pop ES
+    pop DI
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    ret
+RESET_TRACK endp
+;-------------------------------------------------------
+RESET_BACKGROUND proc near
     ; (Send to TRACK file)
     ; Set background color to WHITE
                       mov  AH, 06h                      ; Scroll up function
@@ -120,6 +158,117 @@ RESET_BACKGROUND proc
                       ret
 RESET_BACKGROUND endp
 ;-------------------------------------------------------
+;----------------- RANDOMIZATION ----------------------;
+RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
+    push cx
+    push dx
+    mov  ah, 2ch
+    int  21h
+    mov  ah, 0
+    mov  al, dl                       ;;micro seconds
+    add al, prev_rand
+    mov cl, dh
+    ror al, cl
+    ;mov cx, CURR_Y
+    ;ror al, cl
+    mov prev_rand, al
+    div  bl
+    pop dx
+    pop cx
+    ret
+RANDOM_NUMBER endp
+;-------------------------------------------------------
+GET_RANDOM_INDEX proc near      ; BL: number of indexes, BH: multiply
+ call RANDOM_NUMBER
+ mov al, ah
+ mov ah, 0
+ mov bl, bh
+ mul bl
+ ret
+GET_RANDOM_INDEX endp
+;-------------------------------------------------------
+RANDOM_DIRECTION proc
+                      push bx                           ;1
+                      push ax                           ;2
+                      push dx                           ;3
+                      push cx                           ;4
+                      push di                           ;5
+                      inc  curr_rand
+                      mov  bl, 4
+                      call RANDOM_NUMBER
+                      mov  al, direction
+                      xor  al, 1
+                      cmp  ah, al
+                      jnz  DONT_FIX
+                      xor  ah, 1
+    DONT_FIX:         
+                      mov  direction,ah
+                      pop  di                           ;5
+                      pop  cx                           ;4
+                      pop  dx                           ;3
+                      pop  ax                           ;2
+                      pop  bx                           ;1
+                      ret
+RANDOM_DIRECTION endp
+;-------------------------------------------------------
+RANDOMIZE_START proc near
+    mov BL, GRID_SIZE / 2
+    call RANDOM_NUMBER
+    mov AL, AH
+    mov AH, 0                           ; AX = NEW_INDEX
+    mov GRID_INDEX, AX
+    call GET_GRID_INDEX
+    mov xstart, CX
+    mov ystart, DX
+    ret
+RANDOMIZE_START endp
+;-------------------------------------------------------
+GET_GRID_INDEX proc near
+    push BX
+    push AX
+    mov AX, GRID_INDEX
+    mov BL, GRID_WIDTH
+    div BL                              ; AL = INDEX / ROW_SIZE = Y, AH = X
+    push AX
+    mov AH, 0
+    mov BL, BLOCK_HEIGHT
+    mul BL
+    mov DX, AX
+    pop AX
+    mov AL, AH
+    mov AH, 0
+    mov BL, BLOCK_WIDTH
+    mul BL
+    mov CX, AX
+    pop AX
+    pop BX
+    ret
+GET_GRID_INDEX endp
+;-------------------------------------------------------
+RANDOM_SPAWN_POWERUP proc far
+  RANDOM_SPAWN_LOOP:
+  mov CX, 0
+  mov DX, 0
+  mov BL, GAME_BORDER_X_MAX / BLOCK_WIDTH
+  mov BH, BLOCK_WIDTH
+  call GET_RANDOM_INDEX             ; 16 options, mul by 20
+  add CX, AX
+  mov BL, GAME_BORDER_Y_MAX / BLOCK_HEIGHT
+  mov BH, BLOCK_HEIGHT
+  call GET_RANDOM_INDEX             ; 16 options, mul by 20
+  add DX, AX
+  ; CHECK IF AVAILABLE
+  mov AH, 0Dh
+  int 10h
+  cmp AL, RED
+  jz RANDOM_SPAWN_LOOP
+  cmp AL, GREEN
+  jz RANDOM_SPAWN_LOOP
+  call SPAWN_POWERUP
+  ret
+RANDOM_SPAWN_POWERUP endp
+;-------------------------------------------------------
+;------------------- GENERATION -----------------------;
 Save_Track proc                                         ;;Function To Save Track From Screen to Array
                       mov  cx,0
                       mov  dx,0
@@ -168,81 +317,6 @@ Load_Track proc                                         ;Function To Load Track 
                       ret
 Load_Track endp
 ;-------------------------------------------------------
-GET_RANDOM_INDEX proc near      ; BL: number of indexes, BH: multiply
- call RANDOM_NUMBER
- mov al, ah
- mov ah, 0
- mov bl, bh
- mul bl
- ret
-GET_RANDOM_INDEX endp
-;-------------------------------------------------------
-RANDOM_NUMBER proc near                 ; AH = RANDOM_NUMBER % BL
-    push cx
-    push dx
-    mov  ah, 2ch
-    int  21h
-    mov  ah, 0
-    mov  al, dl                       ;;micro seconds
-    add al, prev_rand
-    mov cl, dh
-    ror al, cl
-    ;mov cx, CURR_Y
-    ;ror al, cl
-    mov prev_rand, al
-    div  bl
-    pop dx
-    pop cx
-    ret
-RANDOM_NUMBER endp
-;-------------------------------------------------------
-random_direction proc
-                      push bx                           ;1
-                      push ax                           ;2
-                      push dx                           ;3
-                      push cx                           ;4
-                      push di                           ;5
-                      inc  curr_rand
-                      mov  bl, 4
-                      call RANDOM_NUMBER
-                      mov  al, direction
-                      xor  al, 1
-                      cmp  ah, al
-                      jnz  DONT_FIX
-                      xor  ah, 1
-    DONT_FIX:         
-                      mov  direction,ah
-                      pop  di                           ;5
-                      pop  cx                           ;4
-                      pop  dx                           ;3
-                      pop  ax                           ;2
-                      pop  bx                           ;1
-                      ret
-random_direction endp
-;-------------------------------------------------------
-RANDOM_SPAWN_POWERUP proc far
-  RANDOM_SPAWN_LOOP:
-  mov CX, 0
-  mov DX, 0
-  mov BL, GAME_BORDER_X_MAX / BLOCK_WIDTH
-  mov BH, BLOCK_WIDTH
-  call GET_RANDOM_INDEX             ; 16 options, mul by 20
-  add CX, AX
-  mov BL, GAME_BORDER_Y_MAX / BLOCK_HEIGHT
-  mov BH, BLOCK_HEIGHT
-  call GET_RANDOM_INDEX             ; 16 options, mul by 20
-  add DX, AX
-  ; CHECK IF AVAILABLE
-  mov AH, 0Dh
-  int 10h
-  cmp AL, RED
-  jz RANDOM_SPAWN_LOOP
-  cmp AL, GREEN
-  jz RANDOM_SPAWN_LOOP
-  call SPAWN_POWERUP
-  ret
-RANDOM_SPAWN_POWERUP endp
-;-------------------------------------------------------
 SPAWN_POWERUP proc near
   ;push DI
   mov bx, 0703h
@@ -281,8 +355,7 @@ PATH_BLOCK proc near                                        ;Draw Brown (06h) Sq
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov cx, CURR_X
-                      mov dx, CURR_Y
+                      call GET_GRID_INDEX
                       mov bx, 0703h
                       call GET_RANDOM_INDEX             ; 3 options, mul by 7
                                                         ; 0, 7, 14
@@ -305,46 +378,42 @@ Make_Boost PROC near                                       ;Draw Boost
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      mov cx, CURR_X
-                      mov dx, CURR_Y
-                      call SPAWN_POWERUP
+                      call GET_GRID_INDEX
+                      ;push DI
+                      mov bx, 0703h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                                        ; 0, 5, 10
+                      add ax, 3                         ; 5, 10, 15
+                      add cx, ax
+                      mov bx, 0703h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 5
+                                                        ; 0, 5, 10
+                      add ax, 3                         ; 5, 10, 15
+                      add dx, ax
+                      mov bl, 5                         ; 4 options
+                      CALL RANDOM_NUMBER
+                      mov al, ah
+                      inc al
+                      call ADD_OBSTACLE
                       pop  di                           ;3
                       pop  bx                           ;2
                       pop  ax                           ;1
                       ret
 Make_Boost ENDP
 ;-------------------------------------------------------
-draw_square PROC near                                        ;Draw A gray Square to Represnt Our beautiful Track
+CREATE_BLOCK PROC near                                        ;Draw A gray Square to Represnt Our beautiful Track
                       push ax                           ;1
                       push bx                           ;2
                       push di                           ;3
-                      cmp  boolFinished,0
-                      jz   no
-                      mov  ah, 0ch
-                      mov  al, FinishLineColor
-                      JMP  YES
-    no:               mov  ax,0c08h
-    YES:              
+                      ; cccccccc           count bits
+                      ; Store direction in another array
                       mov  curr_rand, 0
                       inc  pathlength
-                      mov  cx, CURR_X
-                      mov  dx, CURR_Y
-                      mov  bx, cx
-                      add  bx, BLOCK_WIDTH
-                      mov  di, dx
-                      add  di, BLOCK_HEIGHT
-    row:              int  10h
-                      inc  cx
-                      cmp  cx,bx
-                      jz   column
-                      jmp  row
-    column:           
-                      sub  cx, BLOCK_WIDTH
-                      inc  dx
-                      cmp  dx,di
-                      jz   exit
-                      jmp  row
-    exit:             
+                      ;call DRAW_BLOCK
+                      lea BX, GRID
+                      add BX, GRID_INDEX
+                      mov AX, CURR_BLOCK
+                      mov [BX], AL
                       mov dx, CURR_BLOCK
                       cmp dx, 2
                       jng Dont_Boost
@@ -365,7 +434,44 @@ draw_square PROC near                                        ;Draw A gray Square
                       pop  bx                           ;2
                       pop  ax                           ;1
                       ret
-draw_square ENDP
+CREATE_BLOCK ENDP
+;-------------------------------------------------------
+DRAW_BLOCK proc near                                    ; AL: block color
+  push AX
+  push BX
+  cmp  boolFinished,0
+  jz   no
+  mov  ah, 0ch
+  mov  al, FinishLineColor
+  JMP  YES
+  no:               
+  mov  ax,0c08h
+  YES:              
+  
+  ;mov  cx, CURR_X
+  ;mov  dx, CURR_Y
+  call GET_GRID_INDEX
+  mov  bx, cx
+  add  bx, BLOCK_WIDTH
+  mov  di, dx
+  add  di, BLOCK_HEIGHT
+  row:              
+  int  10h
+  inc  cx
+  cmp  cx,bx
+  jz   column
+  jmp  row
+  column:           
+  sub  cx, BLOCK_WIDTH
+  inc  dx
+  cmp  dx,di
+  jz   exit
+  jmp  row
+  exit:
+  pop BX
+  pop AX
+  ret        
+DRAW_BLOCK endp
 ;-------------------------------------------------------
 GENERATE_TRACK proc far
 
@@ -374,8 +480,8 @@ GENERATE_TRACK proc far
                       xor BX, BX
     ; Initialize Video Mode
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
-
-
+                      call RESET_BACKGROUND             ;Resest Our Green BackGround
+                      call RESET_TRACK
     restart:                                            ;Restart Only if less than MinPathLength
                       push ax
                       mov  ax,minpathlength
@@ -384,31 +490,33 @@ GENERATE_TRACK proc far
                       jb   extra1
                       jmp  far ptr Terminate_Program
     extra1:           
-                      mov CURR_BLOCK, 0
-                      mov ah, -1
-                      call ADD_OBSTACLE
-                      call RESET_BACKGROUND             ;Resest Our Green BackGround
+                      call RESET_TRACK
                       mov  cx,xstart
                       mov  dx,ystart
+                      ;call GET_GRID_INDEX
                       mov  CURR_X,cx
                       mov  CURR_Y,dx
-                      call draw_square
-                      mov  pathlength,1
-                      mov  curr_rand,0
+                      call CREATE_BLOCK
     GENERATE_LOOP:    
                       mov  cx,CURR_X
                       mov  dx,CURR_Y
-                      CALL random_direction                ; Get a random direction
+                      mov BX, GRID_INDEX
+                      ;call GET_GRID_INDEX
+                      CALL RANDOM_DIRECTION                ; Get a random direction
+                      mov AL, direction
                       push ax
                       mov  ax,max_rand
                       cmp  curr_rand,ax
                       pop  AX
+                      mov AL, -1
                       jz   restart
-    ; Process the direction to determine the movement
+                      ; Process the direction to determine the movement
                       CMP  direction, UP                 ; Up
                       Jz   MOVE_UP
                       CMP  direction, DOWN                 ; Down 
-                      Jz   MOVE_DOWN
+                      Jnz   skip_MOVE_DOWN
+                      Jmp   far ptr MOVE_DOWN
+                      skip_MOVE_DOWN:
                       CMP  direction, LEFT                 ; Left
                       jnz  rightdirection
                       jmp  far ptr MOVE_LEFT
@@ -418,101 +526,93 @@ GENERATE_TRACK proc far
                       jmp  far ptr MOVE_RIGHT
     nodirection:      
     cont:             JMP  GENERATE_LOOP
-
-
-
     MOVE_UP:          
-                      cmp  dx,GAME_BORDER_Y_MIN              ;if out of boundries
-                      JNZ  skipupbound
+                     ; call GET_GRID_INDEX
+                      cmp  bx, GRID_WIDTH              ;if out of boundries
+                      Jnl  skipupbound
                       jmp  far ptr GENERATE_LOOP
     skipupbound:      
-                      sub  dx, BLOCK_HEIGHT
-                      mov  ah, 0dh                      ; Get pixel color to AL
-                      int  10h
-                      cmp  al, GREY                     ; if current pixel is gray
-                      jz   GENERATE_LOOP                ; Block already found
+                      sub BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jnz cont
+                      cmp  BX, GRID_WIDTH
+                      jl   skipup                       ; New Block At Screen Top
 
-                      cmp  dx, GAME_BORDER_Y_MIN
-                      jz   skipup                       ; New Block At Screen Top
-
-                      sub  dx, BLOCK_HEIGHT             ; if upper pixel is gray
-                      int  10h
-                      cmp  al, GREY
-                      jz   GENERATE_LOOP                ; New Block will generate loop (connected above it)
+                      sub BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jnz cont
+                      add BX, GRID_WIDTH
                       add  dx, BLOCK_HEIGHT
     skipup:           
-
                       cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH   ; if at right boundary
                       jz   skipup2
 
                       add  cx, BLOCK_WIDTH              ; if right pixel gray
-                      int  10h                          ; get color
-                      cmp  al, GREY
-                      jz   GENERATE_LOOP                ; New Block will generate loop (connected on its right)
+                      add BX, 1
+                      cmp [GRID + BX], AL
+                      jnz   cont                ; New Block will generate loop (connected on its right)
                       sub  cx, BLOCK_WIDTH
+                      sub BX, 1
     skipup2:          
                       cmp  cx, GAME_BORDER_X_MIN
                       jz   skipup3                      ; if at left boundary
                       sub  cx, BLOCK_WIDTH              ;if left pixel gray
-                      int  10h                          ;get color
-                      cmp  al, GREY
-                      jnz  skipup3
+                      sub BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipup3
                       jmp  far ptr GENERATE_LOOP        ; New Block will generate loop (connected on its left)
     skipup3:          sub  CURR_Y, BLOCK_HEIGHT
-                      call draw_square
+                      sub GRID_INDEX, GRID_WIDTH
+                      call CREATE_BLOCK
                       mov al, UP                        ; Store UP direction
                       call STORE_DIRECTION
                       jmp  cont
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     MOVE_DOWN:        
-                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT ;out of bound
-                      jnz  skipdownboundary
+                      cmp  bx, GRID_SIZE - GRID_WIDTH ;out of bound
+                      jl  skipdownboundary
                       jmp  far ptr GENERATE_LOOP
     skipdownboundary:  
-                      add  dx, BLOCK_HEIGHT
-                      mov  ah,0dh                       ; if current pixel is gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  extra2
+                      add BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra2
                       jmp  far ptr GENERATE_LOOP
     extra2:           
-                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
-                      jz   skipdown
+                      cmp  bx, GRID_SIZE - GRID_WIDTH ;out of bound
+                      jnl   skipdown
 
-                      add  dx, BLOCK_HEIGHT                        ; if lower pixel is gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  extra3
+                      add BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra3
                       jmp  far ptr GENERATE_LOOP
     extra3:           
-                      sub  dx, BLOCK_HEIGHT
+                      sub BX, GRID_WIDTH
 
     skipdown:         
-
                       cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH  ; if at right boundrie
                       jz   skipdown2
 
                       add  cx, BLOCK_WIDTH              ;if right pixel gray
-                      int  10h                          ;get color
-                      cmp  al, GREY
-                      jnz  extra4
+                      add BX, 1
+                      cmp [GRID + BX], AL
+                      jz  extra4
                       jmp  far ptr GENERATE_LOOP
     extra4:           
                       sub  cx, BLOCK_WIDTH
+                      sub BX, 1
     skipdown2:        
                       cmp  cx, GAME_BORDER_X_MIN
                       jz   skipdown3
 
                       sub  cx, BLOCK_WIDTH              ;if left pixel gray
-                      int  10h                          ;get color
-                      cmp  al, GREY
-                      jnz  skipdown3
+                      sub BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipdown3
                       jmp  far ptr GENERATE_LOOP
-
-
     skipdown3:        
                       add  CURR_Y, BLOCK_HEIGHT
-                      call draw_square
+                      add GRID_INDEX, GRID_WIDTH
+                      call CREATE_BLOCK
                       mov al, DOWN
                       call STORE_DIRECTION
                       jmp  cont
@@ -526,41 +626,41 @@ GENERATE_TRACK proc far
     skipleftboundary:  
 
                       sub  cx, BLOCK_WIDTH
-                      mov  ah, 0dh                       ; if current pixel is gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  skipleft
+                      sub BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipleft
                       jmp  far ptr GENERATE_LOOP
     skipleft:         
-                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
-                      jz   skipleft2                    ; if lower pixel is gray
-                      add  dx, BLOCK_HEIGHT
-                      int  10h
-                      cmp  al, GREY
-                      jnz  extra5                       
+                      cmp  bx, GRID_SIZE - GRID_WIDTH
+                      jnl   skipleft2                    ; if lower pixel is gray
+                      add BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra5                       
                       jmp  far ptr GENERATE_LOOP
     extra5:           
-                      sub  dx, BLOCK_HEIGHT
+                      sub BX, GRID_WIDTH
     skipleft2:        
-                      cmp  dx, GAME_BORDER_Y_MIN
-                      jz   skipleft3
-                      sub  dx, BLOCK_HEIGHT                   ;if upper pixel gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  extra6
+                      cmp  bx, GRID_WIDTH
+                      jl   skipleft3
+                      sub BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra6
                       jmp  far ptr GENERATE_LOOP
-    extra6:           add  dx, BLOCK_HEIGHT
+                      
+    extra6:           
+                      add BX, GRID_WIDTH
     skipleft3:        
                       cmp  cx, GAME_BORDER_X_MIN               ;if left pixel gray
                       jz   skipleft4
                       sub  cx, BLOCK_WIDTH
-                      int  10h
-                      cmp  al, GREY
-                      jnz  skipleft4
+                      sub BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipleft4
                       jmp  far ptr GENERATE_LOOP
     skipleft4:        
                       sub  CURR_X, BLOCK_WIDTH
-                      call draw_square
+                      sub GRID_INDEX, 1
+                      call CREATE_BLOCK
                       mov al, LEFT
                       call STORE_DIRECTION
                       jmp  cont
@@ -571,50 +671,51 @@ GENERATE_TRACK proc far
                       jmp  far ptr GENERATE_LOOP
     skiprightboundary: 
                       add  cx, BLOCK_WIDTH
-                      mov  ah,0dh                       ; if current pixel is gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  skipright
+                      add BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipright
                       jmp  far ptr GENERATE_LOOP
     skipright:        
-                      cmp  dx, GAME_BORDER_Y_MAX - BLOCK_HEIGHT
-                      jz   skipright2
-                      add  dx, BLOCK_HEIGHT
-                      int  10h                          ;if lower
-                      cmp  al, GREY
-                      jnz  extra7
+                      cmp  bx, GRID_SIZE - GRID_WIDTH ;out of bound
+                      jnl  skipright2
+                      add BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra7
                       jmp  far ptr GENERATE_LOOP
-    extra7:           sub  dx, BLOCK_HEIGHT
+    extra7:           
+                      sub BX, GRID_WIDTH
     skipright2:       
-                      cmp  dx, GAME_BORDER_Y_MIN
-                      jz   skipright3
-                      sub  dx, BLOCK_HEIGHT                        ;if upper pixel gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  extra8
+                      cmp  bx, GRID_WIDTH
+                      jl   skipright3
+                      sub BX, GRID_WIDTH
+                      cmp [GRID + BX], AL
+                      jz  extra8
                       jmp  far ptr GENERATE_LOOP
-    extra8:           add  dx, BLOCK_HEIGHT
+    extra8:           
+                      add BX, GRID_WIDTH
     skipright3:       
 
                       cmp  cx, GAME_BORDER_X_MAX - BLOCK_WIDTH
                       jz   skipright4
                       add  cx, BLOCK_WIDTH                        ;if right pixel gray
-                      int  10h
-                      cmp  al, GREY
-                      jnz  skipright4
+                      add BX, 1
+                      cmp [GRID + BX], AL
+                      jz  skipright4
                       jmp  far ptr GENERATE_LOOP
     skipright4:       
                       add  CURR_X, BLOCK_WIDTH
-                      call draw_square
+                      add GRID_INDEX, 1
+                      call CREATE_BLOCK
                       mov al, RIGHT
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
-                      MOV  boolFinished, 1
+                      ;MOV  boolFinished, 1
                       mov al, FINISH
                       call STORE_DIRECTION
+                      call DRAW_TRACK
                       call DECORATE_TRACK
-                      ;CALL draw_square                 ; Draw Our Final RedSqaure To Represnt End Line
+                      ;CALL CREATE_BLOCK                 ; Draw Our Final RedSqaure To Represnt End Line
                       call Save_Track                   ; Save Track in Array For Further Usage
                       mov al, DIRECTIONS                ; Store first direction for cars starting direction
                       ;HLT
@@ -633,6 +734,32 @@ STORE_DIRECTION proc near
     pop BX
     ret
 STORE_DIRECTION endp
+;-------------------------------------------------------
+;------------------- DISPLAYING -----------------------;
+DRAW_TRACK proc near
+    push BX
+    push AX
+    call RESET_BACKGROUND             ;Resest Our Green BackGround
+    mov GRID_INDEX, 0
+    lea BX, GRID
+    mov CX, 128
+    Draw_Blocks_loop:
+    mov AL, -1
+    mov AH, [BX]
+    cmp AL, AH
+    jz Next_loop_1
+    push CX
+    call DRAW_BLOCK
+    pop CX
+    Next_loop_1:
+    inc BX
+    inc GRID_INDEX
+    loop Draw_Blocks_loop
+    EXIT_DRAW_TRACK:
+    pop AX
+    pop BX
+    ret
+DRAW_TRACK endp
 ;-------------------------------------------------------
 DECORATE_TRACK proc near
     push BX
@@ -1096,4 +1223,5 @@ GET_BLOCK_INDEX proc near               ; CX: X, DX, Y
     mov DX, AX
     ret
 GET_BLOCK_INDEX endp
+;-------------------------------------------------------
 end
