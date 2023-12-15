@@ -26,41 +26,38 @@
   MAX_ENTITIES_NUM EQU 100
   OLD_TIME_SEC DB 0
   RANDOM_SPAWN_TIME DB RANDOM_SPAWN
-  TYPE_WIDTH  DB 5, 7, 7, 7, 7
-  TYPE_HEIGHT DB 5, 7, 7, 7, 7
+  TYPE_WIDTH  DB 5, 5, 5, 5, 5
+  TYPE_HEIGHT DB 5, 5, 5, 5, 5
   TIRE_IMG        DB  0,  0,  0,  0,  0 
                   DB  0,  0,  0,  0,  0 
                   DB  0,  0, 15,  0,  0
                   DB  0,  0,  0,  0,  0 
-                  DB  0,  0,  0,  0,  0 
-  SPEED_BOOST_IMG DB  0,  0, 43, 43, 43,  0,  0
-                  DB  0, 43, 43, 43, 43, 43,  0
-                  DB 43, 43, 43, 43, 43, 43, 43
-                  DB 43, 43, 43, 43, 43, 43, 43
-                  DB 43, 43, 43, 43, 43, 43, 43
-                  DB  0, 43, 43, 43, 43, 43,  0
-                  DB  0,  0, 43, 43, 43,  0,  0
-  SLOW_DOWN_IMG   DB  0,  0, 13, 13, 13,  0,  0
-                  DB  0, 13, 13, 13, 13, 13,  0
-                  DB 13, 13, 13, 13, 13, 13, 13
-                  DB 13, 13, 13, 13, 13, 13, 13
-                  DB 13, 13, 13, 13, 13, 13, 13
-                  DB  0, 13, 13, 13, 13, 13,  0
-                  DB  0,  0, 13, 13, 13,  0,  0
-  DROP_TIRE_IMG   DB  0,  0, 15, 43, 15,  0,  0
-                  DB  0, 43, 15, 43, 15, 43,  0
-                  DB 43, 43, 15, 43, 15, 43, 43
-                  DB 43, 43, 15, 43, 15, 43, 43
-                  DB 43, 43, 15, 43, 15, 43, 43
-                  DB  0, 43, 15, 43, 15, 43,  0
-                  DB  0,  0, 15, 43, 15,  0,  0
-  PASS_TIRE_IMG   DB  0,  0, 15, 15, 15,  0,  0
-                  DB  0, 13, 15, 15, 15, 13,  0
-                  DB 13, 13, 15, 15, 15, 13, 13
-                  DB 13, 13, 15, 15, 15, 13, 13
-                  DB 13, 13, 15, 15, 15, 13, 13
-                  DB  0, 13, 15, 15, 15, 13,  0
-                  DB  0,  0, 15, 15, 15,  0,  0
+                  DB   0,  0,  0,  0,  0 
+  SPEED_BOOST_IMG DB 2Bh, 2Bh, 2Ch, 2Bh, 2Bh
+                  DB 2Bh, 2Ch, 2Ch, 2Ch, 2Bh
+                  DB 2Ch, 2Ch, 2Ch, 2Ch, 2Ch
+                  DB 2Bh, 2Ch, 2Ch, 2Ch, 2Bh
+                  DB 2Bh, 2Bh, 2Ch, 2Bh, 2Bh
+  SLOW_DOWN_IMG   DB 37h, 37h, 37h, 37h, 37h
+                  DB 37h, 39h, 39h, 39h, 37h
+                  DB 39h, 39h, 39h, 39h, 39h
+                  DB 37h, 39h, 39h, 39h, 37h
+                  DB 37h, 37h, 37h, 37h, 37h
+  DROP_TIRE_IMG   DB 12h, 12h, 18h, 12h, 12h
+                  DB 12h, 17h, 17h, 17h, 12h
+                  DB 18h, 18h, 17h, 18h, 18h
+                  DB 12h, 18h, 18h, 18h, 12h
+                  DB 12h, 12h, 18h, 12h, 12h
+  PASS_TIRE_IMG   DB 35h, 36h, 36h, 36h, 35h
+                  DB 35h, 34h, 34h, 34h, 35h
+                  DB 35h, 34h, 34h, 34h, 35h
+                  DB 36h, 34h, 34h, 34h, 36h
+                  DB 36h, 35h, 34h, 35h, 36h
+  ROCKET_IMG      DB   0, 70h, 70h, 70h,   0
+                  DB   0, 70h, 64h, 70h,   0
+                  DB 70h, 64h, 28h, 64h, 70h
+                  DB 70h, 13h, 28h, 13h, 70h
+                  DB 13h, 2Bh, 13h, 2Bh, 13h
   ;TYPE1 DB 25 dup(09h)
   OLD_TIME_AUX DB 0
   ENTITIES_COUNT DW 0
