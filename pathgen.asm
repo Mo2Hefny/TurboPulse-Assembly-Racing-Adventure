@@ -7,6 +7,7 @@
     PUBLIC RANDOM_SPAWN_POWERUP
     PUBLIC CLEAR_ENTITY
     PUBLIC CHECK_CAR_ON_PATH
+    PUBLIC GET_BLOCK_DEPTH
     PUBLIC xstart
     PUBLIC ystart
 .model huge
@@ -58,6 +59,7 @@
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
+    FINAL_BLOCK      DB 0
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -436,43 +438,6 @@ CREATE_BLOCK PROC near                                        ;Draw A gray Squar
                       ret
 CREATE_BLOCK ENDP
 ;-------------------------------------------------------
-DRAW_BLOCK proc near                                    ; AL: block color
-  push AX
-  push BX
-  cmp  boolFinished,0
-  jz   no
-  mov  ah, 0ch
-  mov  al, FinishLineColor
-  JMP  YES
-  no:               
-  mov  ax,0c08h
-  YES:              
-  
-  ;mov  cx, CURR_X
-  ;mov  dx, CURR_Y
-  call GET_GRID_INDEX
-  mov  bx, cx
-  add  bx, BLOCK_WIDTH
-  mov  di, dx
-  add  di, BLOCK_HEIGHT
-  row:              
-  int  10h
-  inc  cx
-  cmp  cx,bx
-  jz   column
-  jmp  row
-  column:           
-  sub  cx, BLOCK_WIDTH
-  inc  dx
-  cmp  dx,di
-  jz   exit
-  jmp  row
-  exit:
-  pop BX
-  pop AX
-  ret        
-DRAW_BLOCK endp
-;-------------------------------------------------------
 GENERATE_TRACK proc far
 
                       mov  AX, @data
@@ -711,6 +676,9 @@ GENERATE_TRACK proc far
                       jmp  cont
     Terminate_Program:
                       ;MOV  boolFinished, 1
+                      mov AX, CURR_BLOCK
+                      dec AX
+                      mov FINAL_BLOCK, AL
                       mov al, FINISH
                       call STORE_DIRECTION
                       call DRAW_TRACK
@@ -736,6 +704,43 @@ STORE_DIRECTION proc near
 STORE_DIRECTION endp
 ;-------------------------------------------------------
 ;------------------- DISPLAYING -----------------------;
+DRAW_BLOCK proc near                                    ; AL: block color
+  push AX
+  push BX
+  cmp  boolFinished,0
+  jz   no
+  mov  ah, 0ch
+  mov  al, FinishLineColor
+  JMP  YES
+  no:               
+  mov  ax,0c08h
+  YES:              
+  
+  ;mov  cx, CURR_X
+  ;mov  dx, CURR_Y
+  call GET_GRID_INDEX
+  mov  bx, cx
+  add  bx, BLOCK_WIDTH
+  mov  di, dx
+  add  di, BLOCK_HEIGHT
+  row:              
+  int  10h
+  inc  cx
+  cmp  cx,bx
+  jz   column
+  jmp  row
+  column:           
+  sub  cx, BLOCK_WIDTH
+  inc  dx
+  cmp  dx,di
+  jz   exit
+  jmp  row
+  exit:
+  pop BX
+  pop AX
+  ret        
+DRAW_BLOCK endp
+;-------------------------------------------------------
 DRAW_TRACK proc near
     push BX
     push AX
@@ -1175,6 +1180,7 @@ END_BLOCK_H proc near
                       ret
 END_BLOCK_H endp
 ;-------------------------------------------------------
+;------------------- GAME LOGIC -----------------------;
 CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER, BX: X_SEC_CORNER, DI: Y_SEC_CORNER
     push BX
     call GET_BLOCK_INDEX
@@ -1223,5 +1229,31 @@ GET_BLOCK_INDEX proc near               ; CX: X, DX, Y
     mov DX, AX
     ret
 GET_BLOCK_INDEX endp
+;-------------------------------------------------------
+GET_BLOCK_DEPTH proc far
+    push BX
+    mov AX, CX
+    mov BL, BLOCK_WIDTH
+    div BL
+    mov AH, 0
+    mov CX, AX
+    mov AX, DX
+    mov BL, BLOCK_HEIGHT
+    div BL
+    mov AH, 0
+    mov BL, GRID_WIDTH
+    mul BL
+    add AX, CX                                          ; AX = GRID_INDEX
+    lea BX, GRID
+    add BX, AX
+    mov AH, 0
+    mov AL, [BX]
+    cmp FINAL_BLOCK, AL
+    jg DIDNT_REACH_END
+        mov AH, 1
+    DIDNT_REACH_END:
+    pop BX
+    ret
+GET_BLOCK_DEPTH endp
 ;-------------------------------------------------------
 end

@@ -6,6 +6,7 @@
   EXTRN ystart:WORD
   EXTRN CLEAR_ENTITY:FAR
   EXTRN CHECK_CAR_ON_PATH:FAR
+  EXTRN GET_BLOCK_DEPTH:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
@@ -70,9 +71,12 @@ endm
   ; Variables
   OLD_TIME_AUX DB 0
   OLD_TIME_SEC DB 0
+  OLD_X DW ?
+  OLD_Y DW ?
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
   CURRENT_VELOCITY DW ?
+  CAR_WON DB 0                                        ; 1 First car, 2 Second car
 
   CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
   CAR_Y DW 3Ah, 3Ah                                   ; CenterY position of player1, player2
@@ -81,6 +85,7 @@ endm
   CAR_ACCELERATION DW 0, 0                         ; Acceleration Value of player1, player2
   CAR_COLLISION DB 0, 0                         ; Acceleration Value of player1, player2
   CAR_POWER DB 0, 0
+  CAR_PROGRESS DB 0, 0
 
           ; Release Press
   CAR1_KEYS DB  25h, 25h                            ; K : 10, 9
@@ -133,9 +138,10 @@ UPDATE_CAR proc near
   xor BX, BX
   mov BL, CURRENT_CAR
   mov CX, [CAR_X + BX]
+  mov OLD_X, CX
   mov DX, [CAR_Y + BX]
-  mov BL, CAR_HEIGHT
-  call CLEAR_ENTITY
+  mov OLD_Y, DX
+  
   call MOVE_CAR
   ; RESET DIRECTION IF CAR IS AT REST
   call CAR_AT_REST
@@ -143,6 +149,11 @@ UPDATE_CAR proc near
   call CHECK_ENTITY_COLLISION
   call CHECK_PATH_COLLISION
   call DROP_OBSTACLE
+  call GET_TRACK_PROGRESS
+  mov CX, OLD_X
+  mov DX, OLD_Y
+  mov BL, CAR_HEIGHT
+  call CLEAR_ENTITY
   EXIT_UPDATE_CAR:
   ret
 UPDATE_CAR endp
@@ -788,6 +799,22 @@ UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
   ret
 UPDATE_POWERUPS endp
 ;-------------------------------------------------------
+GET_TRACK_PROGRESS proc near
+  mov BH, 0
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  call GET_BLOCK_DEPTH                  ; Returns depth in AL
+  shr BL, 1
+  mov [CAR_PROGRESS + BX], AL
+  cmp AH, 0
+  jz DIDNT_REACH_END
+  mov CAR_WON, AH
+  add CAR_WON, BL
+  DIDNT_REACH_END:
+  ret
+GET_TRACK_PROGRESS endp
+;-------------------------------------------------------
 DRAW_CARS proc far
   push ES
   mov AX, 0A000h
@@ -988,19 +1015,19 @@ moveCursor 0CH, 0AH
 
     moveCursor 0CH, 02H
     mov ah, 2h
-    mov dl, CAR_POWER
+    mov dl, CAR_WON
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, CAR_POWER[1]
+    mov dl, CAR_PROGRESS
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, CAR_MOVEMENT_DIR[1]
+    mov dl, CAR_PROGRESS[0]
     add dl, '0'
     int 21H
     moveCursor 015H, 02H
-    mov dl, CAR_IMG_DIR[1]
+    mov dl, CAR_PROGRESS[1]
     add dl, '0'
     int 21H
 
