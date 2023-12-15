@@ -1,3 +1,4 @@
+    PUBLIC TRACK
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
     EXTRN ENTITIES_COUNT:WORD
@@ -8,7 +9,7 @@
     PUBLIC CHECK_CAR_ON_PATH
     PUBLIC xstart
     PUBLIC ystart
-.model medium
+.model huge
 .stack 64
 .data
     ; Constants
@@ -25,6 +26,7 @@
     GREY                  EQU 08h
     GREEN                 EQU 02h
     RED                   EQU 0Ch
+    WHITE                 EQU 0Fh
     UP EQU 0
     DOWN EQU 1
     RIGHT EQU 2
@@ -45,7 +47,7 @@
     prev_rand        db 0
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
-    TRACK            DB 57800 DUP (?)    ;To save and Load Track
+    TRACK            DB 64000 DUP (?)    ;To save and Load Track
     Block_Percentage db 30               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 30               ;100-this Percentage so if 90 its 10
@@ -108,8 +110,12 @@ RESET_BACKGROUND proc
                       mov  AH, 06h                      ; Scroll up function
                       xor  AL, AL                       ; Clear entire screen
                       xor  CX, CX                       ; Upper left corner CH=row, CL=column
-                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  DX, 134Fh                    ; lower right corner DH=row, DL=column
                       mov  BH, GREEN                      ; Green-BackGround
+                      int  10h
+                      mov  CX,1400h                       ; Upper left corner CH=row, CL=column
+                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  BH, 00h                      ; Green-BackGround
                       int  10h
                       ret
 RESET_BACKGROUND endp
@@ -229,28 +235,45 @@ RANDOM_SPAWN_POWERUP proc far
   ; CHECK IF AVAILABLE
   mov AH, 0Dh
   int 10h
-  cmp AL, GREY
-  jnz RANDOM_SPAWN_LOOP
+  cmp AL, RED
+  jz RANDOM_SPAWN_LOOP
+  cmp AL, GREEN
+  jz RANDOM_SPAWN_LOOP
   call SPAWN_POWERUP
   ret
 RANDOM_SPAWN_POWERUP endp
 ;-------------------------------------------------------
 SPAWN_POWERUP proc near
-  mov bx, 0503h
+  ;push DI
+  mov bx, 0703h
   call GET_RANDOM_INDEX             ; 3 options, mul by 5
                                     ; 0, 5, 10
-  add ax, 5                         ; 5, 10, 15
+  add ax, 3                         ; 5, 10, 15
   add cx, ax
-  mov bx, 0503h
+  mov bx, 0703h
   call GET_RANDOM_INDEX             ; 3 options, mul by 5
                                     ; 0, 5, 10
-  add ax, 5                         ; 5, 10, 15
+  add ax, 3                         ; 5, 10, 15
   add dx, ax
-  mov bl, 4                         ; 4 options
+  mov bl, 5                         ; 4 options
   CALL RANDOM_NUMBER
   mov al, ah
   inc al
+  ; CHECK IF AVAILABLE
+  mov DI, AX
+  mov BH, 0
+  mov AH, 0Dh
+  int 10h
+  cmp AL, GREY
+  jz VALID_SPAWN_LOCATION
+  cmp AL, WHITE
+  jz VALID_SPAWN_LOCATION
+  jmp EXIT_SPAWN_POWERUP
+  VALID_SPAWN_LOCATION:
+  mov AX, DI
   call ADD_OBSTACLE
+  EXIT_SPAWN_POWERUP:
+  ;pop DI
   ret
 SPAWN_POWERUP endp
 ;-------------------------------------------------------
@@ -260,15 +283,15 @@ PATH_BLOCK proc near                                        ;Draw Brown (06h) Sq
                       push di                           ;3
                       mov cx, CURR_X
                       mov dx, CURR_Y
-                      mov bx, 0504h
-                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
-                                                        ; 0, 5, 10, 15
-                      add ax, 2                         ; 2, 7, 12, 17
+                      mov bx, 0703h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 7
+                                                        ; 0, 7, 14
+                      add ax, 3                         ; 2, 10, 17
                       add cx, ax
-                      mov bx, 0504h
-                      call GET_RANDOM_INDEX             ; 4 options, mul by 5
-                                                        ; 0, 5, 10, 15
-                      add ax, 2                         ; 2, 7, 12, 17
+                      mov bx, 0703h
+                      call GET_RANDOM_INDEX             ; 3 options, mul by 7
+                                                        ; 0, 7, 14
+                      add ax, 3                         ; 2, 10, 17
                       add dx, ax
                       mov AL, 0
                       call ADD_OBSTACLE

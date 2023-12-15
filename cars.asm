@@ -953,36 +953,36 @@ LOAD_CARS endp
 PRINT_TEST proc far
 moveCursor 0CH, 0AH
     mov ah, 2h
-    mov dl, CAR1_POWERS_TIME
+    mov dl, CAR1_KEYS_STATUS
     add dl, '0'
     int 21H
     moveCursor 0FH, 0AH
-    mov dl, CAR1_POWERS_TIME[1]
+    mov dl, CAR1_KEYS_STATUS[1]
     add dl, '0'
     int 21H
     moveCursor 012H, 0AH
-    mov dl, CAR1_POWERS_TIME[2]
+    mov dl, CAR1_KEYS_STATUS[2]
     add dl, '0'
     int 21H
     moveCursor 015H, 0AH
-    mov dl, CAR1_POWERS_TIME[3]
+    mov dl, CAR1_KEYS_STATUS[3]
     add dl, '0'
     int 21H
     moveCursor 0CH, 0FH
     mov ah, 2h
-    mov dl, CAR2_POWERS_TIME
+    mov dl, CAR2_KEYS_STATUS
     add dl, '0'
     int 21H
     moveCursor 0FH, 0FH
-    mov dl, CAR2_POWERS_TIME[1]
+    mov dl, CAR2_KEYS_STATUS[1]
     add dl, '0'
     int 21H
     moveCursor 012H, 0FH
-    mov dl, CAR2_POWERS_TIME[2]
+    mov dl, CAR2_KEYS_STATUS[2]
     add dl, '0'
     int 21H
     moveCursor 015H, 0FH
-    mov dl, CAR2_POWERS_TIME[3]
+    mov dl, CAR2_KEYS_STATUS[3]
     add dl, '0'
     int 21H
 
