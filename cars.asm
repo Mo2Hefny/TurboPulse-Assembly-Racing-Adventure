@@ -439,6 +439,7 @@ HANDLE_MOVEMENT proc near
   ; Check For Collision
   call CHECK_ENTITY_COLLISION
   call CHECK_PATH_COLLISION
+  call CHECK_CARS_COLLISION
   SKIP_PRIMARY_MOVEMENT:
   mov CURRENT_MOVEMENT, 1
   mov DX, CURRENT_SEC_VELOCITY
@@ -448,6 +449,7 @@ HANDLE_MOVEMENT proc near
   ; Check For Collision
   call CHECK_ENTITY_COLLISION
   call CHECK_SEC_PATH_COLLISION
+  call CHECK_CARS_COLLISION
   EXIT_HANDLE_MOVEMENT:
   ret
 HANDLE_MOVEMENT endp
@@ -806,6 +808,80 @@ CHECK_SEC_PATH_COLLISION proc near
   pop DI
   ret
 CHECK_SEC_PATH_COLLISION endp
+;-------------------------------------------------------
+CHECK_CARS_COLLISION proc near
+  ; FIRST CAR
+  mov DL, CAR_HEIGHT
+  mov DH, CAR_WIDTH
+  mov BX, DX
+  mov AL, CAR_MOVEMENT_DIR[0]
+  cmp AL, RIGHT
+  jl SKIP_DIMENSION_SWITCH           ; IF Vertical DH = PW, DL = PH
+  cmp AL, LEFT
+  jg SKIP_DIMENSION_SWITCH           ; IF Vertical DH = PW, DL = PH
+  mov CL, 8
+  rol DX, CL                          ; ELSE DH = PH, DL = PW
+  SKIP_DIMENSION_SWITCH:
+  mov AL, CAR_MOVEMENT_DIR[1]
+  cmp AL, RIGHT
+  jl SKIP_DIMENSION_SWITCH_2           ; IF Vertical BH = PW, BL = PH
+  cmp AL, LEFT
+  jg SKIP_DIMENSION_SWITCH_2           ; IF Vertical BH = PW, BL = PH
+  mov CL, 8
+  rol BX, CL                          ; ELSE DH = PH, DL = PW
+  SKIP_DIMENSION_SWITCH_2:
+  add DL, BL
+  add DH, BH
+  ; IF (abs(x - Px) >= DH)  isn't colliding
+  mov AX, [CAR_X + 0]
+  mov CX, [CAR_X + 2]
+  cmp AX, CX
+  jnl ABSOLUTE_X
+  xchg AX, CX
+  ABSOLUTE_X:
+  sub AX, CX
+  mov CX, 0
+  mov CL, DH
+  shl AX, 1
+  cmp AX, CX
+  jnl NO_COLLISION
+  sub DH, AL                          ; Stores the needed X to move
+  shr DH, 1
+  ; IF (abs(y - Py) >= DL)  isn't colliding
+  mov AX, [CAR_Y + 0]
+  mov CX, [CAR_Y + 2]
+  cmp AX, CX
+  jnl ABSOLUTE_Y
+  xchg AX, CX
+  ABSOLUTE_Y:
+  sub AX, CX
+  mov CX, 0
+  mov CL, DL
+  shl AX, 1
+  cmp AX, CX
+  jnl NO_COLLISION
+  sub DL, AL                          ; Stores the needed Y to move
+  shr DL, 1
+  mov AX, 0
+  cmp CURRENT_MOVEMENT, AL
+  jnz SEC_CARS_COLLISION
+  call RESTORE_CAR_POSITION
+  jmp NO_COLLISION
+  SEC_CARS_COLLISION:
+  call CANCEL_SEC_MOVEMENT
+  NO_COLLISION:
+  ret
+CHECK_CARS_COLLISION endp
+;-------------------------------------------------------
+RESTORE_CAR_POSITION proc near            ; DH: X to move, DL: Y to move
+  mov BX, 0
+  mov BL, CURRENT_CAR
+  mov CX, OLD_X
+  mov DX, OLD_Y
+  mov [CAR_X + BX], CX
+  mov [CAR_Y + BX], DX
+  ret 
+RESTORE_CAR_POSITION endp
 ;-------------------------------------------------------
 ;-------------------  POWER UPS -----------------------;
 USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
