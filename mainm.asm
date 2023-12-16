@@ -3,7 +3,7 @@ PUBLIC p1name
 PUBLIC p2name
 PUBLIC p1actual
 PUBLIC p2actual
-
+PUBLIC getsizes
 PUBLIC MAINMENU
 .model huge
 .stack 64
@@ -14,22 +14,20 @@ yind equ 08h
 varx db ?
 vary db ?
 
-maxnumchar equ 14
+maxnumchar equ 15
 
 currentchar db ?
 
-p1name db 15 dup('$')
+p1name db 16 dup('$')
 p1actual db 0
 
-p2name db 15 dup('$')
+p2name db 16 dup('$')
 p2actual db 0
 
-
-filename db 'b.bin', 0
+namesimg db 'b.bin', 0
 buffer_size equ 64000
-emessage db "error:reenter your name"
-lenmessage db "only 14 chars allowed"
-
+emessage db   "error:reenter your name",'$'
+lenmessage db "only 15 chars allowed  "
 
 IMAGE_HEIGHT equ 200;YOUR HEIGHT
 IMAGE_WIDTH equ 320;YOUR WIDTH
@@ -38,6 +36,7 @@ SCREEN_WIDTH equ 320
 SCREEN_HEIGHT equ 200
 ;---------------------------------------
 .code
+
 drawImage proc                                         ;Function To Load Track From array to Screen
                       mov  cx,0
                       mov  dx,0
@@ -61,19 +60,11 @@ drawImage proc                                         ;Function To Load Track F
     exit696:            
                       ret
 drawImage endp
-
-MAINMENU PROC FAR
-    push DS
-    push ES
-    MOV AX,@DATA
-    MOV ds,AX
-
+GetNames PROC
     mov ah, 03Dh
     mov al, 0 ; open attribute: 0 - read-only, 1 - write-only, 2 -read&write
-    mov dx, offset filename ; ASCIIZ filename to open
+    mov dx, offset namesimg ; ASCIIZ filename to open
     int 21h
-
-
 
     mov bx, AX
     mov ah, 03Fh
@@ -81,17 +72,7 @@ MAINMENU PROC FAR
     mov dx, offset TRACK ; were to put read data
     int 21h
 
-   
-
-
-
-    ;mov ah, 3Eh         ; DOS function: close file
-    ;INT 21H
-
-
-
     CALL drawImage
-     
     push AX
     push bx
     push dx
@@ -206,7 +187,7 @@ lenerror:
     mov  bh, 0    ; page.
     lea  bp, lenmessage  ; offset.
     mov  bl,40h ; default attribute.
-    mov  cx, 21  ; char number.
+    mov  cx, 23  ; char number.
     mov  dl, 0ah    ; col.
     mov  dh, 0ah    ; row.
     mov  ah, 13h    ; function.
@@ -222,12 +203,7 @@ done:
     pop dx
     pop bx
     pop ax
-
-
-
 ;;;;;;;;;;;; player2
-
-
     CALL drawImage
 
     push AX
@@ -360,8 +336,20 @@ done2:
     pop dx
     pop bx
     pop ax
+GetNames endp
+getsizes proc far
+mov al,p1actual
+mov ah,p2actual
+ret
+getsizes endp 
+MAINMENU PROC FAR
+    push DS
+    push ES
+    MOV AX,@DATA
+    MOV ds,AX
+    call GetNames
     pop ES
     pop DS
     ret
-MAINMENU ENDP
+MAINMENU ENDp
 end 

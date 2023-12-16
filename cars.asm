@@ -12,12 +12,15 @@
   EXTRN CHECK_COLLISION:FAR
   ; PUBLIC
   PUBLIC CHECK_INPUT_UPDATES
+  PUBLIC GETCARINFO
   PUBLIC PRINT_TEST
   PUBLIC LOAD_CARS
   PUBLIC MOVE_CARS
   PUBLIC DRAW_CARS
   PUBLIC CAR_X
   PUBLIC CAR_Y
+  PUBLIC CAR_PROGRESS
+  PUBLIC CAR_POWER
   moveCursor macro x, y
     mov dl, x
     mov dh, y
@@ -110,6 +113,16 @@ endm
   CAR2_POWERS_TIME DB 0, 0, 0, 0
 .code
 ;-------------------------------------------------------
+GETCARINFO PROC FAR
+    MOV AL,CAR_WON
+    lea bx,CAR_POWER
+    mov cl,[bx]
+    mov ch,[bx+1]
+    LEA BX,CAR_PROGRESS
+    MOV DL,[BX]
+    MOV DH,[BX+1]
+    RET
+  GETCARINFO ENDP
 MOVE_CARS proc far
   mov AX, @data
   mov ES, AX

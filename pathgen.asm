@@ -10,6 +10,7 @@
     PUBLIC GET_BLOCK_DEPTH
     PUBLIC xstart
     PUBLIC ystart
+    PUBLIC pathlength
 .model huge
 .stack 64
 .data
