@@ -14,7 +14,7 @@
   PUBLIC CHECK_INPUT_UPDATES
   PUBLIC PRINT_TEST
   PUBLIC LOAD_CARS
-  PUBLIC MOVE_CARS
+  PUBLIC UPDATE_CARS
   PUBLIC DRAW_CARS
   PUBLIC CAR_X
   PUBLIC CAR_Y
@@ -38,7 +38,7 @@ endm
   CAR_WIDTH             EQU 05h               ; The width of all cars
   CAR_HEIGHT            EQU 09h               ; The height of all cars
   CAR_SPEED             EQU 2
-  ACCELERATION_INCREASE EQU 1
+  ACCELERATION_INCREASE EQU 2
   ACCELERATION_DECREASE EQU 1
   MAX_ACCELERATION      EQU 8
   
@@ -63,7 +63,7 @@ endm
   DOWN_LEFT EQU 5
   UP_LEFT EQU 6
   DOWN_RIGHT EQU 7
-  BOOST EQU 2
+  BOOST EQU 1
   SLOW EQU 1
   POWERUP_TIME EQU 5
   POWERUPS_COUNT EQU 4
@@ -75,7 +75,9 @@ endm
   OLD_Y DW ?
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
-  CURRENT_VELOCITY DW ?
+  CURRENT_MOVEMENT DB ?
+  CURRENT_MAIN_VELOCITY DW ?
+  CURRENT_SEC_VELOCITY DW ?
   CAR_WON DB 0                                        ; 1 First car, 2 Second car
 
   CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
@@ -227,7 +229,8 @@ HANDLE_KEYS_PRIORITY proc near          ; CL : Button state, AH: second key, AL:
   ret
 HANDLE_KEYS_PRIORITY endp
 ;-------------------------------------------------------
-MOVE_CARS proc far
+;---------------- HANDLE CAR UPDATES ------------------;
+UPDATE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
@@ -241,11 +244,11 @@ MOVE_CARS proc far
   call UPDATE_CAR
 
   call UPDATE_POWERUPS
-  EXIT_MOVE_CARS:
+  EXIT_UPDATE_CARS:
   mov AL, TIME_AUX
   mov OLD_TIME_AUX, AL
   ret
-MOVE_CARS endp
+UPDATE_CARS endp
 ;-------------------------------------------------------
 UPDATE_CAR proc near
   call CHECK_INPUT
@@ -258,15 +261,12 @@ UPDATE_CAR proc near
   mov OLD_X, CX
   mov DX, [CAR_Y + BX]
   mov OLD_Y, DX
-  
-  call MOVE_CAR
-  ; RESET DIRECTION IF CAR IS AT REST
-  call CAR_AT_REST
-  ; Check For Collision
-  call CHECK_ENTITY_COLLISION
-  call CHECK_PATH_COLLISION
+  ; MOVEMENT
+  call HANDLE_MOVEMENT
+  ; POWERS
   call DROP_OBSTACLE
   call GET_TRACK_PROGRESS
+  ; DISPLAY
   mov CX, OLD_X
   mov DX, OLD_Y
   mov BL, CAR_HEIGHT
@@ -414,65 +414,83 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
                                         ; NOT WORKING XD
   mov CL, 3                            
   SAR AX, CL                            ; To make acceleration smaller
+  mov CURRENT_MAIN_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
   cmp AX, 0
   jnl SKIP_FIXING_ACC
   mov BL, -1
   imul BL
   SKIP_FIXING_ACC:
-  mov CURRENT_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
+  mov BL, 2
+  idiv BL
+  CBW
+  mov CURRENT_SEC_VELOCITY, AX
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
 ;--------------------- MOVEMENT -----------------------;
-MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
+HANDLE_MOVEMENT proc near
+  mov CURRENT_MOVEMENT, 0
+  mov DX, CURRENT_MAIN_VELOCITY
+  cmp DX, 0
+  jz SKIP_PRIMARY_MOVEMENT
+  call MOVE_CAR
+  ; RESET DIRECTION IF CAR IS AT REST
+  call CAR_AT_REST
+  ; Check For Collision
+  call CHECK_ENTITY_COLLISION
+  call CHECK_PATH_COLLISION
+  SKIP_PRIMARY_MOVEMENT:
+  mov CURRENT_MOVEMENT, 1
+  mov DX, CURRENT_SEC_VELOCITY
+  cmp DX, 0
+  jz EXIT_HANDLE_MOVEMENT
+  call MOVE_CAR
+  ; Check For Collision
+  call CHECK_ENTITY_COLLISION
+  call CHECK_SEC_PATH_COLLISION
+  EXIT_HANDLE_MOVEMENT:
+  ret
+HANDLE_MOVEMENT endp
+;-------------------------------------------------------
+MOVE_CAR proc near                      ; AL: SELECTED_DIRECTION, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
   ; Load Car Info Depending on BX: Car_Number
   xor BX, BX
   mov BL, CURRENT_CAR
   lea DI, [CAR_X + BX]
   lea SI, [CAR_Y + BX]
   sar BX, 1
-  mov AL, [MAIN_KEY_PRESSED + BX]
-  mov DX, CURRENT_VELOCITY
-  mov AH, [SECOND_KEY_PRESSED + BX]
-  cmp AH, -1
-  jz MOVE_CAR_LOOP
-  mov CX, AX
-  mov AX, DX
-  mov BL, 2
-  idiv BL
-  CBW
-  mov DX, AX
-  mov AX, CX
-  ; Move Car According To The Current Direction
-  ; Horizontal Movement
-  MOVE_CAR_LOOP:
+  mov AH, 0
+  cmp CURRENT_MOVEMENT, AH
+  jnz SECONDARY_MOVEMENT
+  mov AL, [CAR_IMG_DIR + BX]
+  mov DX, CURRENT_MAIN_VELOCITY
+  jmp MOVE_CAR_FUNC
+  SECONDARY_MOVEMENT:
+  mov AL, [SECOND_KEY_PRESSED + BX]
+  mov DX, CURRENT_SEC_VELOCITY
+  MOVE_CAR_FUNC:
   cmp AL, -1
   jz EXIT_MOVE_CAR
   cmp AL, 0
   jnz SKIP_MOVE_UP
   call MOVE_UP_PROC
-  jmp SECONDARY_MOVEMENT
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_UP:
   cmp AL, 1
   jnz SKIP_MOVE_DOWN
   call MOVE_DOWN_PROC
-  jmp SECONDARY_MOVEMENT
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_DOWN:
   cmp AL, 2
   jnz SKIP_MOVE_RIGHT
   call MOVE_RIGHT_PROC
-  jmp SECONDARY_MOVEMENT
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_RIGHT:
   cmp AL, 3
   jnz SKIP_MOVE_LEFT
   call MOVE_LEFT_PROC
-  jmp SECONDARY_MOVEMENT
+  jmp EXIT_MOVE_CAR
   SKIP_MOVE_LEFT:
-
-  SECONDARY_MOVEMENT:
-  mov AL, AH
-  mov AH, -1
-  jmp MOVE_CAR_LOOP
 
   EXIT_MOVE_CAR:
   mov BX, 0
@@ -581,9 +599,15 @@ CHECK_ENTITY_COLLISION proc near
   mov CAR2_POWERS_TIME[3], AH
   jmp EXIT_CHECK_ENTITY_COLLISION
   HANDLE_TIRE_COLLISION:
+  mov AL, 0
+  cmp CURRENT_MOVEMENT, AL
+  jnz OVERRIDE_SEC_VELOCITY
   call FIX_COLLISION
-  mov CURRENT_VELOCITY, DX
+  mov CURRENT_MAIN_VELOCITY, DX
   call MOVE_CAR
+  jmp EXIT_CHECK_ENTITY_COLLISION
+  OVERRIDE_SEC_VELOCITY:
+  call CANCEL_SEC_MOVEMENT
   jmp EXIT_CHECK_ENTITY_COLLISION
   SKIP_COLLISION_FIX:
   cmp AH, 0
@@ -624,15 +648,41 @@ FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATIO
   ret
 FIX_COLLISION endp
 ;-------------------------------------------------------
+CANCEL_SEC_MOVEMENT proc near
+  mov AL, SECOND_KEY_PRESSED
+  push AX
+  xor AL, 1
+  mov SECOND_KEY_PRESSED, AL
+  call MOVE_CAR
+  pop AX
+  mov SECOND_KEY_PRESSED, AL
+  ret
+CANCEL_SEC_MOVEMENT endp
+;-------------------------------------------------------
 CHECK_PATH_COLLISION proc near
   push DI
   xor BX, BX
   mov BL, CURRENT_CAR
   mov CX, [CAR_X + BX]
   mov DX, [CAR_Y + BX]
-  mov AX, 0
+  mov AX, [CAR_ACCELERATION + BX]
   shr BX, 1
   mov AH, [CAR_MOVEMENT_DIR + BX]
+  cmp AL, 0
+  jnl PATH_NORMAL_STRAIGHT
+  mov AL, [CAR_IMG_DIR + BX]
+  cmp AL, AH
+  jnz PATH_NORMAL
+  xor AH, 1
+  jmp PATH_NORMAL
+  PATH_NORMAL_STRAIGHT:
+  cmp AL, 0
+  jng PATH_NORMAL
+  mov AL, [CAR_IMG_DIR + BX]
+  cmp AL, AH
+  jz PATH_NORMAL
+  xor AH, 1
+  PATH_NORMAL:
   cmp AH, Left
   jz CHECK_HORIZONTAL
   cmp AH, Right
@@ -669,26 +719,93 @@ CHECK_PATH_COLLISION proc near
   mov BX, CX
   jmp CHECK_PATH
   CHECK_PATH:
+  push AX
   call CHECK_CAR_ON_PATH
   cmp al, GREEN
   jz PATH_COLLISION
   cmp al, RED
   jz PATH_COLLISION
+  pop AX
   jmp EXIT_CHECK_PATH
   PATH_COLLISION:
+  pop AX
   xor BX, BX
   mov BL, CURRENT_CAR
   mov AX, 0
   mov [CAR_ACCELERATION + BX], AX
-  mov AX, CURRENT_VELOCITY
+  mov AX, CURRENT_MAIN_VELOCITY
   xor AX, -1
   add AX, 1
-  mov CURRENT_VELOCITY, AX
+  mov CURRENT_MAIN_VELOCITY, AX
   call MOVE_CAR
   EXIT_CHECK_PATH:
   pop DI
   ret
 CHECK_PATH_COLLISION endp
+;-------------------------------------------------------
+CHECK_SEC_PATH_COLLISION proc near
+  push DI
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov CX, [CAR_X + BX]
+  mov DX, [CAR_Y + BX]
+  mov AX, 0
+  shr BX, 1
+  mov AH, [SECOND_KEY_PRESSED + BX]
+  cmp AH, Left
+  jz CHECK_HORIZONTAL_SEC
+  cmp AH, Right
+  jz CHECK_HORIZONTAL_SEC
+  ; Vertical
+  add CX, CAR_HEIGHT / 2
+  mov BX, CX
+  sub CX, CAR_HEIGHT                     ; BX -> CX + CAR_WIDTH
+  cmp AH, UP
+  jnz CHECK_DOWN_SEC
+  ; Go To Upper Side
+  sub DX, CAR_WIDTH / 2
+  mov DI, DX
+  jmp CHECK_PATH_SEC
+  CHECK_DOWN_SEC:
+  ; Go To Lower Side
+  add DX, CAR_WIDTH / 2
+  mov DI, DX
+  jmp CHECK_PATH_SEC
+  CHECK_HORIZONTAL_SEC:
+  ; Horizontal
+  add DX, CAR_HEIGHT / 2
+  mov DI, DX
+  sub DX, CAR_HEIGHT                     ; DI -> DX + CAR_WIDTH
+  cmp AH, LEFT
+  jnz CHECK_RIGHT_SEC
+  ; Go To Left Side
+  sub CX, CAR_WIDTH / 2
+  mov BX, CX
+  jmp CHECK_PATH_SEC
+  CHECK_RIGHT_SEC:
+  ; Go To Right Side
+  add CX, CAR_WIDTH / 2
+  mov BX, CX
+  jmp CHECK_PATH_SEC
+  CHECK_PATH_SEC:
+  call CHECK_CAR_ON_PATH
+  cmp al, GREEN
+  jz PATH_COLLISION_SEC
+  cmp al, RED
+  jz PATH_COLLISION_SEC
+  jmp EXIT_CHECK_PATH_SEC
+  PATH_COLLISION_SEC:
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  mov AX, CURRENT_SEC_VELOCITY
+  xor AX, -1
+  add AX, 1
+  mov CURRENT_SEC_VELOCITY, AX
+  call MOVE_CAR
+  EXIT_CHECK_PATH_SEC:
+  pop DI
+  ret
+CHECK_SEC_PATH_COLLISION endp
 ;-------------------------------------------------------
 ;-------------------  POWER UPS -----------------------;
 USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
@@ -818,6 +935,56 @@ GET_TRACK_PROGRESS proc near
   ret
 GET_TRACK_PROGRESS endp
 ;-------------------------------------------------------
+LOAD_CARS proc far                      ; AL: Start Direction
+  mov BX, xstart
+  add BX, 5
+  mov [CAR_X], BX
+  add BX, 9
+  mov [CAR_X + 2], BX
+  cmp AL, UP
+  jnz LOAD_CARS_DOWN
+  mov [CAR_IMG_DIR], UP
+  mov [CAR_IMG_DIR + 1], UP
+  mov BX, ystart
+  add BX, 13
+  mov [CAR_Y], BX
+  mov [CAR_Y + 2], BX
+  ret
+  LOAD_CARS_DOWN:
+  cmp AL, DOWN
+  jnz LOAD_CARS_LEFT
+  mov [CAR_IMG_DIR], DOWN
+  mov [CAR_IMG_DIR + 1], DOWN
+  mov BX, ystart
+  add BX, 7
+  mov [CAR_Y], BX
+  mov [CAR_Y + 2], BX
+  ret
+  LOAD_CARS_LEFT:
+  mov BX, ystart
+  add BX, 5
+  mov [CAR_Y], BX
+  add BX, 9
+  mov [CAR_Y + 2], BX
+  cmp AL, LEFT
+  jnz LOAD_CARS_RIGHT
+  mov [CAR_IMG_DIR], LEFT
+  mov [CAR_IMG_DIR + 1], LEFT
+  mov BX, xstart
+  add BX, 13
+  mov [CAR_x], BX
+  mov [CAR_x + 2], BX
+  ret
+  LOAD_CARS_RIGHT:
+  mov [CAR_IMG_DIR], RIGHT
+  mov [CAR_IMG_DIR + 1], RIGHT
+  mov BX, xstart
+  add BX, 7
+  mov [CAR_x], BX
+  mov [CAR_x + 2], BX
+  ret
+LOAD_CARS endp
+;-------------------------------------------------------;
 ;------------------- DISPLAYING -----------------------;
 DRAW_CARS proc far
   push ES
@@ -931,91 +1098,41 @@ DRAW_HEIGHT:
     ret
 DRAW_CAR endp
 ;-------------------------------------------------------;
-LOAD_CARS proc far                      ; AL: Start Direction
-  mov BX, xstart
-  add BX, 5
-  mov [CAR_X], BX
-  add BX, 9
-  mov [CAR_X + 2], BX
-  cmp AL, UP
-  jnz LOAD_CARS_DOWN
-  mov [CAR_IMG_DIR], UP
-  mov [CAR_IMG_DIR + 1], UP
-  mov BX, ystart
-  add BX, 13
-  mov [CAR_Y], BX
-  mov [CAR_Y + 2], BX
-  ret
-  LOAD_CARS_DOWN:
-  cmp AL, DOWN
-  jnz LOAD_CARS_LEFT
-  mov [CAR_IMG_DIR], DOWN
-  mov [CAR_IMG_DIR + 1], DOWN
-  mov BX, ystart
-  add BX, 7
-  mov [CAR_Y], BX
-  mov [CAR_Y + 2], BX
-  ret
-  LOAD_CARS_LEFT:
-  mov BX, ystart
-  add BX, 5
-  mov [CAR_Y], BX
-  add BX, 9
-  mov [CAR_Y + 2], BX
-  cmp AL, LEFT
-  jnz LOAD_CARS_RIGHT
-  mov [CAR_IMG_DIR], LEFT
-  mov [CAR_IMG_DIR + 1], LEFT
-  mov BX, xstart
-  add BX, 13
-  mov [CAR_x], BX
-  mov [CAR_x + 2], BX
-  ret
-  LOAD_CARS_RIGHT:
-  mov [CAR_IMG_DIR], RIGHT
-  mov [CAR_IMG_DIR + 1], RIGHT
-  mov BX, xstart
-  add BX, 7
-  mov [CAR_x], BX
-  mov [CAR_x + 2], BX
-  ret
-LOAD_CARS endp
-;-------------------------------------------------------;
 PRINT_TEST proc far
-    moveCursor 0CH, 0AH
-    mov ah, 2h
-    mov dl, CAR1_KEYS_STATUS
-    add dl, '0'
-    int 21H
-    moveCursor 0FH, 0AH
-    mov dl, CAR1_KEYS_STATUS[1]
-    add dl, '0'
-    int 21H
-    moveCursor 012H, 0AH
-    mov dl, CAR1_KEYS_STATUS[2]
-    add dl, '0'
-    int 21H
-    moveCursor 015H, 0AH
-    mov dl, CAR1_KEYS_STATUS[3]
-    add dl, '0'
-    int 21H
-    moveCursor 0CH, 0FH
-    mov ah, 2h
-    mov dl, REVERSE
-    add dl, '0'
-    int 21H
-    moveCursor 0FH, 0FH
-    mov dl, CAR2_KEYS_STATUS[1]
-    add dl, '0'
-    int 21H
-    moveCursor 012H, 0FH
-    mov dl, CAR2_KEYS_STATUS[2]
-    add dl, '0'
-    int 21H
-    moveCursor 015H, 0FH
-    mov dl, CAR2_KEYS_STATUS[3]
-    add dl, '0'
-    int 21H
+    ;moveCursor 0CH, 0AH
+    ;mov ah, 2h
+    ;mov dl, CAR1_KEYS_STATUS
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 0FH, 0AH
+    ;mov dl, CAR1_KEYS_STATUS[1]
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 012H, 0AH
+    ;mov dl, CAR1_KEYS_STATUS[2]
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 015H, 0AH
+    ;mov dl, CAR1_KEYS_STATUS[3]
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 0CH, 0FH
+    ;mov ah, 2h
+    ;mov dl, REVERSE
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 0FH, 0FH
+    ;mov dl, CAR2_KEYS_STATUS[1]
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 012H, 0FH
+    ;mov dl, CAR2_KEYS_STATUS[2]
+    ;add dl, '0'
+    ;int 21H
+    ;moveCursor 015H, 0FH
+    ;mov dl, CAR2_KEYS_STATUS[3]
+    ;add dl, '0'
+    ;int 21H
 
     moveCursor 0CH, 02H
     mov ah, 2h
@@ -1023,15 +1140,15 @@ PRINT_TEST proc far
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, SECOND_KEY_PRESSED[0]
+    mov dl, SECOND_KEY_PRESSED
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, MAIN_KEY_PRESSED[1]
+    mov dl, MAIN_KEY_PRESSED
     add dl, '0'
     int 21H
     moveCursor 015H, 02H
-    mov dl, SECOND_KEY_PRESSED[1]
+    mov dl, SECOND_KEY_PRESSED
     add dl, '0'
     int 21H
 
