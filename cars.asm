@@ -86,6 +86,9 @@ endm
   CAR_COLLISION DB 0, 0                         ; Acceleration Value of player1, player2
   CAR_POWER DB 0, 0
   CAR_PROGRESS DB 0, 0
+  MAIN_KEY_PRESSED DB -1, -1
+  SECOND_KEY_PRESSED DB -1, -1
+  REVERSE DB -1
 
           ; Release Press
   CAR1_KEYS DB  25h, 25h                            ; K : 10, 9
@@ -94,8 +97,6 @@ endm
             DB 0CDh, 4Dh                            ; RIGHT : 4, 3
             DB 0CBh, 4Bh                            ; LEFT : 2, 1
             DB 00h    ; NONE : 0
-
-  CAR1_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; UP, DOWN, RIGHT, LEFT
   CAR1_POWERS_TIME DB 0, 0, 0, 0
 
           ; Release Press
@@ -105,10 +106,126 @@ endm
             DB 0A0h, 20h                            ; D : 4, 3        [BX] + 2
             DB  9Eh, 1Eh                            ; A : 2, 1        [BX] + 3
             DB 00h    ; NONE : 0
-
-  CAR2_KEYS_STATUS DB 0, 0, 0, 0, 0                   ; W, S, D, A
   CAR2_POWERS_TIME DB 0, 0, 0, 0
 .code
+;-------------------------------------------------------
+;------------------- HANDLE INPUT ---------------------;
+CHECK_INPUT_UPDATES proc far
+  push AX
+  push BX
+  push CX
+  push DX
+  push SI
+  push DI
+  push DS
+  push ES
+  in al, 60h ; read scan code
+  cmp AL, 0
+  jz EXIT_CHECK_INPUT_UPDATES
+  push AX
+  lea DI, CAR1_KEYS
+  lea SI, CAR1_POWERS_TIME
+  mov AH, 0
+  mov CURRENT_CAR, AH
+  mov DL, MAIN_KEY_PRESSED[0]
+  mov DH, SECOND_KEY_PRESSED[0]
+  call READ_BUFFER
+  mov MAIN_KEY_PRESSED[0], AL
+  mov SECOND_KEY_PRESSED[0], AH
+  pop AX
+  lea DI, CAR2_KEYS
+  lea SI, CAR2_POWERS_TIME
+  mov AH, 2
+  mov CURRENT_CAR, AH
+  mov DL, MAIN_KEY_PRESSED[1]
+  mov DH, SECOND_KEY_PRESSED[1]
+  call READ_BUFFER
+  mov MAIN_KEY_PRESSED[1], AL
+  mov SECOND_KEY_PRESSED[1], AH
+  EXIT_CHECK_INPUT_UPDATES:
+  mov al,20h
+  out 20h,al
+  pop ES
+  pop DS
+  pop DI
+  pop SI
+  pop DX
+  pop CX
+  pop BX
+  pop AX
+  iret
+CHECK_INPUT_UPDATES endp
+;-------------------------------------------------------
+READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
+  ; Check Selected Car Input
+  MOV CX, 11
+  repne SCASB                           ; Search for AX in CAR_KEYS
+  cmp CX, 0
+  jnz USED_KEY
+  mov AX, DX
+  jmp EXIT_READ_KEYBOARD
+  USED_KEY:
+  cmp CX, 8
+  jng MOVEMENT_KEY
+  call USE_POWERUP
+  mov AX, DX
+  jmp EXIT_READ_KEYBOARD
+  MOVEMENT_KEY:
+  mov AX, DX
+  mov DX, 8
+  sub DL, CL
+  sar DL, 1                             ; 0, 1, 2, 3
+  
+  and CL, 1                             ; 1 if pressed, 0 if released
+  call HANDLE_KEYS_PRIORITY
+  EXIT_READ_KEYBOARD:
+    ret
+READ_BUFFER endp
+;-------------------------------------------------------
+HANDLE_KEYS_PRIORITY proc near          ; CL : Button state, AH: second key, AL: main key, DX: Buttom index
+  mov BX, DX
+  mov DH, BL
+  xor DH , 1
+  mov REVERSE, DH
+  cmp CL, 0
+  jz KEY_IS_RELEASED
+  ; Button is Pressed first
+  cmp AL, DH                            ; Reversing
+  jz OVERWRITE_MAIN_KEY
+  cmp AL, -1
+  jz OVERWRITE_MAIN_KEY
+  ; Button is Pressed Second
+  cmp AL, DL
+  jz EXIT_HANDLE_KEYS_PRIORITY
+  jmp OVERWRITE_SECOND_KEY
+  ;cmp AH, -1
+  ;jz OVERWRITE_SECOND_KEY
+  jmp EXIT_HANDLE_KEYS_PRIORITY
+  KEY_IS_RELEASED:
+  ; Button in main is released
+  cmp AL, DL                            ; Released main key
+  jz SHIFT_KEYS
+  ; Second Button is released
+  cmp AH, DL
+  jz RESET_SECOND_KEY
+  jmp EXIT_HANDLE_KEYS_PRIORITY
+
+  OVERWRITE_MAIN_KEY:
+    mov AL, DL
+    jmp EXIT_HANDLE_KEYS_PRIORITY
+  OVERWRITE_SECOND_KEY:
+    mov AH, DL
+    jmp EXIT_HANDLE_KEYS_PRIORITY
+  SHIFT_KEYS:
+    mov AL, AH
+    mov AH, -1
+    jmp EXIT_HANDLE_KEYS_PRIORITY
+  RESET_SECOND_KEY:
+    mov AH, -1
+    jmp EXIT_HANDLE_KEYS_PRIORITY
+  EXIT_HANDLE_KEYS_PRIORITY:
+  ret
+HANDLE_KEYS_PRIORITY endp
 ;-------------------------------------------------------
 MOVE_CARS proc far
   mov AX, @data
@@ -158,151 +275,40 @@ UPDATE_CAR proc near
   ret
 UPDATE_CAR endp
 ;-------------------------------------------------------
-CHECK_INPUT_UPDATES proc far
-  push AX
-  push BX
-  push CX
-  push DX
-  push SI
-  push DI
-  push DS
-  push ES
-  in al, 60h ; read scan code
-  cmp AL, 0
-  jz EXIT_CHECK_INPUT_UPDATES
-  lea DI, CAR1_KEYS
-  lea BX, CAR1_KEYS_STATUS
-  lea SI, CAR1_POWERS_TIME
-  mov AH, 0
-  mov CURRENT_CAR, AH
-  call READ_BUFFER
-  lea DI, CAR2_KEYS
-  lea BX, CAR2_KEYS_STATUS
-  lea SI, CAR2_POWERS_TIME
-  mov AH, 2
-  mov CURRENT_CAR, AH
-  call READ_BUFFER
-  EXIT_CHECK_INPUT_UPDATES:
-  mov al,20h
-  out 20h,al
-  pop ES
-  pop DS
-  pop DI
-  pop SI
-  pop DX
-  pop CX
-  pop BX
-  pop AX
-  iret
-CHECK_INPUT_UPDATES endp
-;-------------------------------------------------------
-READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS
-  ; Check Selected Car Input
-  MOV CX, 11
-  repne SCASB                           ; Search for AX in CAR_KEYS
-  cmp CX, 0
-  jz EXIT_READ_KEYBOARD
-  cmp CX, 8
-  jng MOVEMENT_KEY
-  call USE_POWERUP
-  jmp EXIT_READ_KEYBOARD
-  MOVEMENT_KEY:
-  mov DX, 8
-  sub DL, CL
-  sar Dl, 1
-  
-  and CL, 1
-  cmp CL, 1
-  jnz SKIP_RESETING
-  mov ch, 0
-  mov [BX], ch
-  mov [BX + 1], ch
-  mov [BX + 2], ch
-  mov [BX + 3], ch
-  SKIP_RESETING:
-  add BX, DX
-  mov [BX], CL
-  ;cmp CL, 0
-  ;jz EXIT_READ_KEYBOARD
-  ;sub BX, DX
-  ;xor DX, 1
-  ;add BX, DX
-  ;mov [BX], CH
-  EXIT_READ_KEYBOARD:
-    ret
-READ_BUFFER endp
-;-------------------------------------------------------
 CHECK_INPUT proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [DX]: IMG_DIR, [SI]: MOVEMENT_DIR
   ; Load Car Info Depending on BX: Car_Number
   mov BX, 0
   mov BL, CURRENT_CAR
-  lea DI, CAR1_KEYS_STATUS
-  cmp BX, 2
-  jnz CHECK_CAR1_KEYS
-  lea DI, CAR2_KEYS_STATUS
-  CHECK_CAR1_KEYS:
   shr BX, 1
   lea SI, [CAR_MOVEMENT_DIR + BX]
   mov AL, [CAR_IMG_DIR + BX]
+  mov CL, [MAIN_KEY_PRESSED + BX]
+  mov CH, [SECOND_KEY_PRESSED + BX]
   mov AH, [SI]
   mov BX, DI
   ; Check Selected Car Input
-  mov CX, 1
-  cmp CL, [DI]
+  cmp CL, -1
+  jz EXIT_CHECK_INPUT
+  cmp CL, 0
   jz MOVEMENT_UP
-  inc DI
-  cmp CL, [DI]
+  cmp CL, 1
   jz MOVEMENT_DOWN
-  inc DI
-  cmp CL, [DI]
+  cmp CL, 2
   jz MOVEMENT_RIGHT
-  inc DI
-  cmp CL, [DI]
+  cmp CL, 3
   jz MOVEMENT_LEFT
-  mov CX, 0
+  mov CX, -1
   jmp EXIT_CHECK_INPUT
 
   MOVEMENT_UP:
-  cmp CL, [DI] + 2     
-  jz MOVEMENT_UP_RIGHT                  ; Up and Right are Pressed
-  cmp CL, [DI] + 3                      
-  jz MOVEMENT_UP_LEFT                   ; Up and Left are Pressed
   mov DH, UP
   mov DL, DOWN
   call CHANGE_DIRECTION
   jmp EXIT_CHECK_INPUT
 
-  MOVEMENT_UP_RIGHT:
-  mov DH, UP_RIGHT
-  mov DL, DOWN_LEFT
-  call CHANGE_DIRECTION
-  jmp EXIT_CHECK_INPUT
-
-  MOVEMENT_UP_LEFT:
-  mov DH, UP_LEFT
-  mov DL, DOWN_RIGHT
-  call CHANGE_DIRECTION
-  jmp EXIT_CHECK_INPUT
-
   MOVEMENT_DOWN:
-  cmp CL, [DI] + 1     
-  jz MOVEMENT_DOWN_RIGHT                ; Down and Right are Pressed
-  cmp CL, [DI] + 2                      
-  jz MOVEMENT_DOWN_LEFT                 ; Down and Left are Pressed
   mov DH, DOWN
   mov DL, UP
-  call CHANGE_DIRECTION
-  jmp EXIT_CHECK_INPUT
-
-  MOVEMENT_DOWN_RIGHT:
-  mov DH, DOWN_RIGHT
-  mov DL, UP_LEFT
-  call CHANGE_DIRECTION
-  jmp EXIT_CHECK_INPUT
-
-  MOVEMENT_DOWN_LEFT:
-  mov DH, DOWN_LEFT
-  mov DL, UP_RIGHT
   call CHANGE_DIRECTION
   jmp EXIT_CHECK_INPUT
 
@@ -352,7 +358,7 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   mov BL, CURRENT_CAR
   lea DI, [CAR_ACCELERATION + BX]
   shr BX, 1
-  cmp CX, 0
+  cmp CX, -1
   jz DECELERATE
   mov AL, [SI]
   mov AH, [CAR_MOVEMENT_DIR + BX]
@@ -408,10 +414,16 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
                                         ; NOT WORKING XD
   mov CL, 3                            
   SAR AX, CL                            ; To make acceleration smaller
+  cmp AX, 0
+  jnl SKIP_FIXING_ACC
+  mov BL, -1
+  imul BL
+  SKIP_FIXING_ACC:
   mov CURRENT_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
   ret
 HANDLE_ACCELERATION endp
 ;-------------------------------------------------------
+;--------------------- MOVEMENT -----------------------;
 MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
   ; Load Car Info Depending on BX: Car_Number
   xor BX, BX
@@ -419,60 +431,48 @@ MOVE_CAR proc near                      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   lea DI, [CAR_X + BX]
   lea SI, [CAR_Y + BX]
   sar BX, 1
-  mov AL, [CAR_IMG_DIR + BX]
+  mov AL, [MAIN_KEY_PRESSED + BX]
   mov DX, CURRENT_VELOCITY
+  mov AH, [SECOND_KEY_PRESSED + BX]
+  cmp AH, -1
+  jz MOVE_CAR_LOOP
+  mov CX, AX
+  mov AX, DX
+  mov BL, 2
+  idiv BL
+  CBW
+  mov DX, AX
+  mov AX, CX
   ; Move Car According To The Current Direction
   ; Horizontal Movement
+  MOVE_CAR_LOOP:
+  cmp AL, -1
+  jz EXIT_MOVE_CAR
   cmp AL, 0
   jnz SKIP_MOVE_UP
   call MOVE_UP_PROC
-  jmp EXIT_MOVE_CAR
+  jmp SECONDARY_MOVEMENT
   SKIP_MOVE_UP:
   cmp AL, 1
   jnz SKIP_MOVE_DOWN
   call MOVE_DOWN_PROC
-  jmp EXIT_MOVE_CAR
+  jmp SECONDARY_MOVEMENT
   SKIP_MOVE_DOWN:
   cmp AL, 2
   jnz SKIP_MOVE_RIGHT
   call MOVE_RIGHT_PROC
-  jmp EXIT_MOVE_CAR
+  jmp SECONDARY_MOVEMENT
   SKIP_MOVE_RIGHT:
   cmp AL, 3
   jnz SKIP_MOVE_LEFT
   call MOVE_LEFT_PROC
-  jmp EXIT_MOVE_CAR
+  jmp SECONDARY_MOVEMENT
   SKIP_MOVE_LEFT:
-  mov BH, AL
-  mov AX, DX
-  mov BL, 3
-  idiv BL
-  CBW
-  sub DX, AX
-  mov AL, BH
-  cmp AL, 4
-  jnz SKIP_MOVE_UP_RIGHT
-  call MOVE_UP_PROC
-  call MOVE_RIGHT_PROC
-  jmp EXIT_MOVE_CAR
-  SKIP_MOVE_UP_RIGHT:
-  cmp AL, 5
-  jnz SKIP_MOVE_DOWN_LEFT
-  call MOVE_DOWN_PROC
-  call MOVE_LEFT_PROC
-  jmp EXIT_MOVE_CAR
-  SKIP_MOVE_DOWN_LEFT:
-  cmp AL, 6
-  jnz SKIP_MOVE_UP_LEFT
-  call MOVE_UP_PROC
-  call MOVE_LEFT_PROC
-  jmp EXIT_MOVE_CAR
-  SKIP_MOVE_UP_LEFT:
-  cmp AL, 7
-  jnz SKIP_MOVE_DOWN_RIGHT
-  call MOVE_DOWN_PROC
-  call MOVE_RIGHT_PROC
-  SKIP_MOVE_DOWN_RIGHT:
+
+  SECONDARY_MOVEMENT:
+  mov AL, AH
+  mov AH, -1
+  jmp MOVE_CAR_LOOP
 
   EXIT_MOVE_CAR:
   mov BX, 0
@@ -501,6 +501,20 @@ MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: C
     ret
 MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
+CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  shr BX, 1
+  mov AL, [CAR_IMG_DIR + BX]
+  lea SI, [CAR_MOVEMENT_DIR + BX]
+  cmp DX, 0
+  jnz EXIT_CAR_AT_REST
+    mov [SI], AL
+  EXIT_CAR_AT_REST:
+  ret
+CAR_AT_REST endp
+;-------------------------------------------------------
+;----------------- HANDLE COLLISION --------------------;
 FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY
   mov BX, CAR_HEIGHT / 2
   ;shr DX, 1                             ; DX = height / 2
@@ -534,19 +548,6 @@ FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [S
   SKIP_FIX_Y:
   ret
 FIX_BOUNDARIES_CONDITION endp
-;-------------------------------------------------------
-CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
-  xor BX, BX
-  mov BL, CURRENT_CAR
-  shr BX, 1
-  mov AL, [CAR_IMG_DIR + BX]
-  lea SI, [CAR_MOVEMENT_DIR + BX]
-  cmp DX, 0
-  jnz EXIT_CAR_AT_REST
-    mov [SI], AL
-  EXIT_CAR_AT_REST:
-  ret
-CAR_AT_REST endp
 ;-------------------------------------------------------
 CHECK_ENTITY_COLLISION proc near
   xor BX, BX
@@ -689,6 +690,7 @@ CHECK_PATH_COLLISION proc near
   ret
 CHECK_PATH_COLLISION endp
 ;-------------------------------------------------------
+;-------------------  POWER UPS -----------------------;
 USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
   mov BH, 0
   mov BL, CURRENT_CAR
@@ -799,6 +801,7 @@ UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
   ret
 UPDATE_POWERUPS endp
 ;-------------------------------------------------------
+;-------------------- UPDATES -------------------------;
 GET_TRACK_PROGRESS proc near
   mov BH, 0
   mov BL, CURRENT_CAR
@@ -815,6 +818,7 @@ GET_TRACK_PROGRESS proc near
   ret
 GET_TRACK_PROGRESS endp
 ;-------------------------------------------------------
+;------------------- DISPLAYING -----------------------;
 DRAW_CARS proc far
   push ES
   mov AX, 0A000h
@@ -978,7 +982,7 @@ LOAD_CARS proc far                      ; AL: Start Direction
 LOAD_CARS endp
 ;-------------------------------------------------------;
 PRINT_TEST proc far
-moveCursor 0CH, 0AH
+    moveCursor 0CH, 0AH
     mov ah, 2h
     mov dl, CAR1_KEYS_STATUS
     add dl, '0'
@@ -997,7 +1001,7 @@ moveCursor 0CH, 0AH
     int 21H
     moveCursor 0CH, 0FH
     mov ah, 2h
-    mov dl, CAR2_KEYS_STATUS
+    mov dl, REVERSE
     add dl, '0'
     int 21H
     moveCursor 0FH, 0FH
@@ -1015,19 +1019,19 @@ moveCursor 0CH, 0AH
 
     moveCursor 0CH, 02H
     mov ah, 2h
-    mov dl, CAR_WON
+    mov dl, MAIN_KEY_PRESSED
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, CAR_PROGRESS
+    mov dl, SECOND_KEY_PRESSED[0]
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, CAR_PROGRESS[0]
+    mov dl, MAIN_KEY_PRESSED[1]
     add dl, '0'
     int 21H
     moveCursor 015H, 02H
-    mov dl, CAR_PROGRESS[1]
+    mov dl, SECOND_KEY_PRESSED[1]
     add dl, '0'
     int 21H
 
