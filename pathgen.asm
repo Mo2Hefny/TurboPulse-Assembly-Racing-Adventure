@@ -331,7 +331,7 @@ SPAWN_POWERUP proc near
                                     ; 0, 5, 10
   add ax, 3                         ; 5, 10, 15
   add dx, ax
-  mov bl, 5                         ; 4 options
+  mov bl, 4                         ; 4 options
   CALL RANDOM_NUMBER
   mov al, ah
   inc al
@@ -392,7 +392,7 @@ Make_Boost PROC near                                       ;Draw Boost
                                                         ; 0, 5, 10
                       add ax, 3                         ; 5, 10, 15
                       add dx, ax
-                      mov bl, 5                         ; 4 options
+                      mov bl, 4                         ; 4 options
                       CALL RANDOM_NUMBER
                       mov al, ah
                       inc al

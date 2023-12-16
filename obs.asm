@@ -26,8 +26,8 @@
   MAX_ENTITIES_NUM EQU 100
   OLD_TIME_SEC DB 0
   RANDOM_SPAWN_TIME DB RANDOM_SPAWN
-  TYPE_WIDTH  DB 5, 5, 5, 5, 5, 5
-  TYPE_HEIGHT DB 5, 5, 5, 5, 5, 5
+  TYPE_WIDTH  DB 5, 5, 5, 5, 5
+  TYPE_HEIGHT DB 5, 5, 5, 5, 5
   TIRE_IMG        DB   0,   0,   0,   0,   0 
                   DB   0,   0,   0,   0,   0 
                   DB   0,   0, 1Fh,   0,   0
@@ -53,11 +53,6 @@
                   DB 35h, 34h, 34h, 34h, 35h
                   DB 36h, 34h, 34h, 34h, 36h
                   DB 36h, 35h, 34h, 35h, 36h
-  ROCKET_IMG      DB   0, 70h, 70h, 70h,   0
-                  DB   0, 70h, 64h, 70h,   0
-                  DB 70h, 64h, 28h, 64h, 70h
-                  DB 70h, 13h, 28h, 13h, 70h
-                  DB 13h, 2Bh, 13h, 2Bh, 13h
   ;TYPE1 DB 25 dup(09h)
   OLD_TIME_AUX DB 0
   ENTITIES_COUNT DW 0
@@ -284,11 +279,6 @@ DRAW_ENTITIES proc far
     call DRAW_PASS_OBSTACLE
     jmp EXIT_DRAW_ENTITIES
     SKIP_PASS_OBSTACLE:
-    cmp AX, 5                           ; TYPE 0: Obstacle
-    jnz SKIP_ROCKET
-    call DRAW_ROCKET
-    jmp EXIT_DRAW_ENTITIES
-    SKIP_ROCKET:
 
     EXIT_DRAW_ENTITIES:
     ; Loop On The Next Obstacle
@@ -376,22 +366,6 @@ DRAW_PASS_OBSTACLE proc near
   pop BX
   ret
 DRAW_PASS_OBSTACLE endp
-;-------------------------------------------------------
-DRAW_ROCKET proc near
-  push BX
-  push AX
-  mov AL, TYPE_WIDTH[5]
-  mov AH, TYPE_HEIGHT[5]
-  mov CURR_ENTITY_WIDTH, AL
-  mov CURR_ENTITY_HEIGHT, AH
-  mov AL, 0
-  mov CURR_TRANSPARENT_COLOR, AL
-  lea SI, ROCKET_IMG
-  call DRAW_SELECTED_ENTITY
-  pop AX
-  pop BX
-  ret
-DRAW_ROCKET endp
 ;-------------------------------------------------------
 DRAW_SELECTED_ENTITY proc near
   ; Send coordinates to top left corner

@@ -707,7 +707,8 @@ CHECK_PATH_COLLISION proc near
   ; Vertical
   add CX, CAR_WIDTH / 2
   mov BX, CX
-  sub CX, CAR_WIDTH                     ; BX -> CX + CAR_WIDTH
+  sub CX, CAR_WIDTH / 2                    ; BX -> CX + CAR_WIDTH
+  sub CX, CAR_WIDTH / 2                    ; BX -> CX + CAR_WIDTH
   cmp AH, UP
   jnz CHECK_DOWN
   ; Go To Upper Side
@@ -723,7 +724,8 @@ CHECK_PATH_COLLISION proc near
   ; Horizontal
   add DX, CAR_WIDTH / 2
   mov DI, DX
-  sub DX, CAR_WIDTH                     ; DI -> DX + CAR_WIDTH
+  sub DX, CAR_WIDTH / 2                    ; DI -> DX + CAR_WIDTH
+  sub DX, CAR_WIDTH / 2                    ; DI -> DX + CAR_WIDTH
   cmp AH, LEFT
   jnz CHECK_RIGHT
   ; Go To Left Side
@@ -1211,19 +1213,19 @@ PRINT_TEST proc far
     ;int 21H
     ;moveCursor 0CH, 0FH
     ;mov ah, 2h
-    ;mov dl, REVERSE
+    ;mov dl, tb
     ;add dl, '0'
     ;int 21H
     ;moveCursor 0FH, 0FH
-    ;mov dl, CAR2_KEYS_STATUS[1]
+    ;mov dl, tb[1]
     ;add dl, '0'
     ;int 21H
     ;moveCursor 012H, 0FH
-    ;mov dl, CAR2_KEYS_STATUS[2]
+    ;mov dl, tb[2]
     ;add dl, '0'
     ;int 21H
     ;moveCursor 015H, 0FH
-    ;mov dl, CAR2_KEYS_STATUS[3]
+    ;mov dl, tb[3]
     ;add dl, '0'
     ;int 21H
 

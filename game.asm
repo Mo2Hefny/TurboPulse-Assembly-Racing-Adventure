@@ -99,7 +99,7 @@ main proc far
     jz terminate
     skipcheck:
   ; Logic
-  call PRINT_TEST
+  ;call PRINT_TEST
   call UPDATE_ENTITIES
   call UPDATE_CARS
   
