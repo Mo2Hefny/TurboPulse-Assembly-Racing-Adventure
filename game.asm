@@ -9,7 +9,7 @@
   EXTRN CHECK_INPUT_UPDATES:FAR
   EXTRN DRAW_CARS:FAR
   EXTRN PRINT_TEST:FAR
-  EXTRN MOVE_CARS:FAR
+  EXTRN UPDATE_CARS:FAR
   EXTRN LOAD_CARS:FAR
   ;mainmenu.asm
   EXTRN MAINMENU:FAR
@@ -99,9 +99,9 @@ main proc far
     jz terminate
     skipcheck:
   ; Logic
-  ;call PRINT_TEST
+  call PRINT_TEST
   call UPDATE_ENTITIES
-  call MOVE_CARS
+  call UPDATE_CARS
   
   ; Draw
   call DRAW_ENTITIES

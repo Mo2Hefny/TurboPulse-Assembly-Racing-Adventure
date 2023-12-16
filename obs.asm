@@ -117,6 +117,7 @@ RANDOM_SPAWN_ENTITY endp
 ;-------------------------------------------------------
 CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR, AH: CAN PASS
                                         ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+  push DI
   mov PLAYER_DIRECTION, AL
   mov CAN_PASS, AH
   mov PLAYER_X, CX
@@ -135,13 +136,17 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   mov AH, 0
   or AL, -1                            ; ZF = 0 since no collision has occured
   EXIT_CHECK_COLLISION:
+  pop DI
   ret
   COLLIDED:
+  mov CX, DI
+  pop DI
   cmp AH, 0
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
 CHECK_ENTITY_COLLISION proc near
+  mov DI, 0
   mov DL, CAR_HEIGHT
   mov DH, CAR_WIDTH
   mov AL, PLAYER_DIRECTION
@@ -168,7 +173,9 @@ CHECK_ENTITY_COLLISION proc near
   mov AX, [ENTITIES_X + BX]
   mov CX, PLAYER_X
   cmp AX, CX
+  mov DI, LEFT                          ; CL = 3 LEFT
   jnl ABSOLUTE_X
+  mov DI, RIGHT                         ; CL = 2 then Car is on the Entity's right side (RIGHT 2)
   xchg AX, CX
   ABSOLUTE_X:
   sub AX, CX
@@ -184,6 +191,7 @@ CHECK_ENTITY_COLLISION proc near
   mov CX, PLAYER_Y
   cmp AX, CX
   jnl ABSOLUTE_Y
+  add DI, 256                       ; BH = 1 then Car is below the Entity (DOWN 1)
   xchg AX, CX
   ABSOLUTE_Y:
   sub AX, CX
@@ -209,6 +217,8 @@ CHECK_ENTITY_COLLISION proc near
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
 HANDLE_OBSTACLE_COLLISION proc near
+  push BX
+  push DX
   mov AH, CAN_PASS
   cmp AH, 0
   jz CANT_PASS_THROUGH
@@ -221,6 +231,8 @@ HANDLE_OBSTACLE_COLLISION proc near
   CANT_PASS_THROUGH:
   xor AH, AH                           ; AH = 0 since a collision has occured
   mov AL, -1
+  pop DX
+  pop BX
   ret
 HANDLE_OBSTACLE_COLLISION endp
 ;-------------------------------------------------------

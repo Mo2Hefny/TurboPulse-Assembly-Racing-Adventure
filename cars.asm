@@ -90,7 +90,6 @@ endm
   CAR_PROGRESS DB 0, 0
   MAIN_KEY_PRESSED DB -1, -1
   SECOND_KEY_PRESSED DB -1, -1
-  REVERSE DB -1
 
           ; Release Press
   CAR1_KEYS DB  25h, 25h                            ; K : 10, 9
@@ -188,7 +187,6 @@ HANDLE_KEYS_PRIORITY proc near          ; CL : Button state, AH: second key, AL:
   mov BX, DX
   mov DH, BL
   xor DH , 1
-  mov REVERSE, DH
   cmp CL, 0
   jz KEY_IS_RELEASED
   ; Button is Pressed first
@@ -442,6 +440,12 @@ HANDLE_MOVEMENT proc near
   call CHECK_CARS_COLLISION
   SKIP_PRIMARY_MOVEMENT:
   mov CURRENT_MOVEMENT, 1
+  mov BX, 0
+  mov BL, CURRENT_CAR
+  shr BL, 1
+  mov AL, [SECOND_KEY_PRESSED + BX]
+  cmp AL, -1
+  jz EXIT_HANDLE_MOVEMENT
   mov DX, CURRENT_SEC_VELOCITY
   cmp DX, 0
   jz EXIT_HANDLE_MOVEMENT
@@ -454,7 +458,7 @@ HANDLE_MOVEMENT proc near
   ret
 HANDLE_MOVEMENT endp
 ;-------------------------------------------------------
-MOVE_CAR proc near                      ; AL: SELECTED_DIRECTION, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
+MOVE_CAR proc near                        ; AL: SELECTED_DIRECTION, [DI]: CAR_CenterX, [SI]: CAR_CenterY, DX: Velocity
   ; Load Car Info Depending on BX: Car_Number
   xor BX, BX
   mov BL, CURRENT_CAR
@@ -501,27 +505,27 @@ MOVE_CAR proc near                      ; AL: SELECTED_DIRECTION, [DI]: CAR_Cent
     ret
 MOVE_CAR endp
 ;-------------------------------------------------------
-MOVE_UP_PROC proc near                  ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
+MOVE_UP_PROC proc near                    ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
     sub [SI], DX
     ret
 MOVE_UP_PROC endp
 ;-------------------------------------------------------
-MOVE_DOWN_PROC proc near                ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
+MOVE_DOWN_PROC proc near                  ; DX: Velocity, [BX]: Direction, [SI]: CAR_CenterY
     add [SI], DX
     ret
 MOVE_DOWN_PROC endp
 ;-------------------------------------------------------
-MOVE_RIGHT_PROC proc near               ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
+MOVE_RIGHT_PROC proc near                 ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
     add [DI], DX              ; DI = CAR_X
     ret
 MOVE_RIGHT_PROC endp
 ;-------------------------------------------------------
-MOVE_LEFT_PROC proc near                ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
+MOVE_LEFT_PROC proc near                  ; DX: Velocity, [BX]: Direction, [DI]: CAR_CenterX
     sub [DI], DX
     ret
 MOVE_LEFT_PROC endp
 ;-------------------------------------------------------
-CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
+CAR_AT_REST proc near                     ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: MOVEMENT_DIR
   xor BX, BX
   mov BL, CURRENT_CAR
   shr BX, 1
@@ -535,7 +539,7 @@ CAR_AT_REST proc near                   ; DX: Velocity, AL: CAR_IMG_DIR, [SI]: M
 CAR_AT_REST endp
 ;-------------------------------------------------------
 ;----------------- HANDLE COLLISION --------------------;
-FIX_BOUNDARIES_CONDITION proc near      ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY
+FIX_BOUNDARIES_CONDITION proc near        ; AL: CAR_IMG_DIR, [DI]: CAR_CenterX, [SI]: CAR_CenterY
   mov BX, CAR_HEIGHT / 2
   ;shr DX, 1                             ; DX = height / 2
   ; X < 0 + height / 2
@@ -585,6 +589,7 @@ CHECK_ENTITY_COLLISION proc near
   mov BH, AH
   push BX
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+                                        ; CX: position of car relative to obstacle
   pop BX
   jnz SKIP_COLLISION_FIX
   mov AH, BH
@@ -619,7 +624,7 @@ CHECK_ENTITY_COLLISION proc near
   ret
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
-FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
+FIX_COLLISION proc near                   ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATION, [SI]: MOVEMENT_DIR, DH: delta(X), DL: delta(Y)
   xor BX, BX
   mov BL, CURRENT_CAR
   lea DI, [CAR_ACCELERATION + BX]
@@ -627,12 +632,19 @@ FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATIO
   mov AL, [CAR_IMG_DIR + BX]
   lea SI, [CAR_MOVEMENT_DIR + BX]
   mov AH, [SI]
+  mov AH, 1
   cmp AL, DOWN
   jng FIX_VERTICAL
   mov DL, DH
+  mov CH, CL
   FIX_VERTICAL:
+  mov CL, 0
   mov DH, 0
-  xor AH, 1                           ; Switch Movement Direction
+  ;xor CH, 1
+  ;xor AH, CH                          ; 0 if the car didn't hit the target but its back touch it while turning
+  ;jz DONT_SWITCH
+  mov AH, CH                         ; Switch Movement Direction
+  ;DONT_SWITCH:
   mov [SI], AH
   XOR AH, AL                          ; 0 if the car collided while reversing
   ; EDIT VELOCITY
@@ -643,9 +655,12 @@ FIX_COLLISION proc near                 ; AL: CAR_IMG_DIR, [DI]: CAR_ACCELERATIO
   SKIP_FIX_VELOCITY:
   push AX
   mov AX, [DI]
+  cmp AX, 4
+  jng EXIT_COLLISION
   xor AX, -1                          ; Make Acceleration = - Acceleration
   sar AX, 1
   mov [DI], AX
+  EXIT_COLLISION:
   pop AX
   ret
 FIX_COLLISION endp
@@ -754,6 +769,8 @@ CHECK_SEC_PATH_COLLISION proc near
   mov AX, 0
   shr BX, 1
   mov AH, [SECOND_KEY_PRESSED + BX]
+  cmp AH, -1
+  jz EXIT_CHECK_PATH_SEC
   cmp AH, Left
   jz CHECK_HORIZONTAL_SEC
   cmp AH, Right
@@ -884,7 +901,7 @@ RESTORE_CAR_POSITION proc near            ; DH: X to move, DL: Y to move
 RESTORE_CAR_POSITION endp
 ;-------------------------------------------------------
 ;-------------------  POWER UPS -----------------------;
-USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
+USE_POWERUP proc near                     ; [SI]: POWERUPS_TIME
   mov BH, 0
   mov BL, CURRENT_CAR
   shr BX, 1
@@ -903,7 +920,7 @@ USE_POWERUP proc near                   ; [SI]: POWERUPS_TIME
   ret
 USE_POWERUP endp
 ;-------------------------------------------------------
-USE_SPEED_RELATED_POWERUP proc near     ; BX: CURRENT SELECTED CAR
+USE_SPEED_RELATED_POWERUP proc near       ; BX: CURRENT SELECTED CAR
   cmp BX, 0
   mov AH, [CAR1_POWERS_TIME]            ; BOOST
   mov AL, CAR2_POWERS_TIME[1]           ; SLOW
@@ -923,7 +940,7 @@ USE_SPEED_RELATED_POWERUP proc near     ; BX: CURRENT SELECTED CAR
   ret
 USE_SPEED_RELATED_POWERUP endp
 ;-------------------------------------------------------
-DROP_OBSTACLE proc near                 ; AL: MOVEMENT_DIR
+DROP_OBSTACLE proc near                   ; AL: MOVEMENT_DIR
   xor BX, BX
   mov BL, CURRENT_CAR
   lea SI, CAR1_POWERS_TIME[2]          ; BOOSTS
@@ -963,7 +980,7 @@ DROP_OBSTACLE proc near                 ; AL: MOVEMENT_DIR
   ret
 DROP_OBSTACLE endp
 ;-------------------------------------------------------
-UPDATE_POWERUPS proc near               ; [SI]: POWERUPS_TIME
+UPDATE_POWERUPS proc near                 ; [SI]: POWERUPS_TIME
   mov AL, TIME_SEC
   cmp OLD_TIME_SEC, AL
   jz EXIT_UPDATE_POWERUPS
@@ -1011,7 +1028,7 @@ GET_TRACK_PROGRESS proc near
   ret
 GET_TRACK_PROGRESS endp
 ;-------------------------------------------------------
-LOAD_CARS proc far                      ; AL: Start Direction
+LOAD_CARS proc far                        ; AL: Start Direction
   mov BX, xstart
   add BX, 5
   mov [CAR_X], BX
@@ -1085,7 +1102,7 @@ DRAW_CARS proc far
   ret
 DRAW_CARS endp
 ;-------------------------------------------------------
-DRAW_CAR proc near                      ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, BL: IMG_DIR
+DRAW_CAR proc near                        ; CX: CAR_X, DX: CAR_Y, [SI]: CAR_IMG, BL: IMG_DIR
     
     cmp BL, RIGHT                           
     jl  SKIP_DX_ADDITION                ; SKIP IF VERTICAL
