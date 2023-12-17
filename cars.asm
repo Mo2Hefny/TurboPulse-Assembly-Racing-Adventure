@@ -1004,7 +1004,7 @@ UPDATE_POWERUPS proc near                 ; [SI]: POWERUPS_TIME
   mov AH, 1
   mov AL, 0
   UPDATE_POWERUPS_LOOP:
-    cmp CX, 1
+    cmp CX, 2
     jz DONT_LOWER_TIMER
     cmp [SI], AL
     jz DONT_LOWER_TIMER
@@ -1015,7 +1015,7 @@ UPDATE_POWERUPS proc near                 ; [SI]: POWERUPS_TIME
   lea SI, CAR2_POWERS_TIME
   mov CX, POWERUPS_COUNT
   UPDATE_POWERUPS_LOOP_2:
-    cmp CX, 1
+    cmp CX, 2
     jz DONT_LOWER_TIMER_2
     cmp [SI], AL
     jz DONT_LOWER_TIMER_2
