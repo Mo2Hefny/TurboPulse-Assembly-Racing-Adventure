@@ -8,7 +8,7 @@ PUBLIC ALLLOST
 .stack 64
 .data
 xcursor equ 11h
-ycursor equ 07h
+ycursor equ 05h
 p1size db 1
 p2size db 1
 PWinimg db 'Pwin.bin', 0
