@@ -589,32 +589,35 @@ CHECK_ENTITY_COLLISION proc near
   call CHECK_COLLISION                  ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
                                         ; CX: position of car relative to obstacle
   pop BX
-  jnz SKIP_COLLISION_FIX
-  mov AH, BH
-  mov BH, 0
-  cmp AH, 0                             ; IF AH is 0 then the pass ability is used.
-  jz HANDLE_TIRE_COLLISION
-  ; USE THE POWER TO PASS
-  mov AH, 0
-  cmp BX, 0
-  jnz REMOVE_PASS_CAR2
-  mov CAR1_POWERS_TIME[3], AH
-  jmp EXIT_CHECK_ENTITY_COLLISION
-  REMOVE_PASS_CAR2:
-  mov CAR2_POWERS_TIME[3], AH
-  jmp EXIT_CHECK_ENTITY_COLLISION
-  HANDLE_TIRE_COLLISION:
-  mov AL, 0
-  cmp CURRENT_MOVEMENT, AL
-  jnz OVERRIDE_SEC_VELOCITY
-  call FIX_COLLISION
-  mov CURRENT_MAIN_VELOCITY, DX
-  call MOVE_CAR
-  jmp EXIT_CHECK_ENTITY_COLLISION
-  OVERRIDE_SEC_VELOCITY:
-  call CANCEL_SEC_MOVEMENT
-  jmp EXIT_CHECK_ENTITY_COLLISION
+  jnz SKIP_COLLISION_FIX                ; No obstacle collision
+    mov AH, BH
+    mov BH, 0
+    cmp AH, 0                             ; IF AH is 0 then the pass ability is used.
+    jz HANDLE_TIRE_COLLISION
+      ; USE THE POWER TO PASS
+      mov AH, 0
+      cmp BX, 0
+      jnz REMOVE_PASS_CAR2
+      mov CAR1_POWERS_TIME[3], AH
+      jmp EXIT_CHECK_ENTITY_COLLISION
+    REMOVE_PASS_CAR2:
+      mov CAR2_POWERS_TIME[3], AH
+      jmp EXIT_CHECK_ENTITY_COLLISION
+    HANDLE_TIRE_COLLISION:
+      mov AL, 0
+      cmp CURRENT_MOVEMENT, AL
+      jnz OVERRIDE_SEC_VELOCITY
+      call FIX_COLLISION
+      mov CURRENT_MAIN_VELOCITY, DX
+      call MOVE_CAR
+      jmp EXIT_CHECK_ENTITY_COLLISION
+    OVERRIDE_SEC_VELOCITY:
+      call CANCEL_SEC_MOVEMENT
+      jmp EXIT_CHECK_ENTITY_COLLISION
   SKIP_COLLISION_FIX:
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  shr BL, 1
   cmp AH, 0
   jz EXIT_CHECK_ENTITY_COLLISION
   mov [CAR_POWER + BX], AH

@@ -136,7 +136,7 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   COLLIDED:
   mov CX, DI
   pop DI
-  cmp AH, 0
+  cmp AH, 0                            ; ZF = 1 if obstacle collision
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
