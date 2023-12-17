@@ -138,7 +138,15 @@ main proc far
   ; Terminate Program
   terminate:    
                 call ALLLOST
-                call PlaySound
+                call GETCARINFO
+                cmp  al,1
+                jz   withoutdelay
+  checkplayer2: cmp  al,2
+                jz   withoutdelay
+  withdelay:    
+                call delay_proc
+                jmp  GameMenulabel
+  withoutdelay: call PlaySound
                 jmp  GameMenulabel
 main endp
   ;-------------------------------------------------------
@@ -253,8 +261,8 @@ DisplayUI proc near
                 jnz  Bypass
                 mov  dx,offset BOOST3NAME
                 jmp  printboost
-  Bypass:       CMP  CL,4
-                jnz  printboost
+  Bypass:                                           ; CMP  CL,4
+  ;              ; jnz  printboost
                 mov  dx,offset BOOST4NAME
   printboost:   
                 MOV  AH,9
