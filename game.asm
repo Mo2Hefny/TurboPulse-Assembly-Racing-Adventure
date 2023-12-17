@@ -99,12 +99,12 @@ main proc far
     jz terminate
     skipcheck:
   ; Logic
-  ;call PRINT_TEST
   call UPDATE_ENTITIES
   call UPDATE_CARS
   
   ; Draw
   call DRAW_ENTITIES
+  ;call PRINT_TEST
   call DRAW_CARS
   
   ; Repeat the process

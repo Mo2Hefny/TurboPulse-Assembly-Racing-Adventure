@@ -7,6 +7,7 @@
   EXTRN CLEAR_ENTITY:FAR
   EXTRN CHECK_CAR_ON_PATH:FAR
   EXTRN GET_BLOCK_DEPTH:FAR
+  EXTRN HANDLE_DROP_POSITION:FAR
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
@@ -952,7 +953,6 @@ DROP_OBSTACLE proc near                   ; AL: MOVEMENT_DIR
   HANDLE_DROP_CAR1:
   cmp [SI], BH
   jz EXIT_DROP_OBSTACLE
-  mov [SI], BH
   mov BL, CURRENT_CAR
   mov CX, [CAR_X + BX]
   mov DX, [CAR_Y + BX]
@@ -976,6 +976,11 @@ DROP_OBSTACLE proc near                   ; AL: MOVEMENT_DIR
   jnz SKIP_DROP_RIGHT
   sub CX, CAR_HEIGHT / 2 + 3
   SKIP_DROP_RIGHT:
+  call HANDLE_DROP_POSITION               ; BL = 1 if valid
+  cmp BL, 0
+  jz EXIT_DROP_OBSTACLE
+  mov BH, 0
+  mov [SI], BH
   mov AX, 0
   call ADD_OBSTACLE
   EXIT_DROP_OBSTACLE:
@@ -1213,19 +1218,19 @@ PRINT_TEST proc far
     ;int 21H
     ;moveCursor 0CH, 0FH
     ;mov ah, 2h
-    ;mov dl, tb
+    ;mov dl, DIR
     ;add dl, '0'
     ;int 21H
     ;moveCursor 0FH, 0FH
-    ;mov dl, tb[1]
+    ;mov dl, DEP
     ;add dl, '0'
     ;int 21H
     ;moveCursor 012H, 0FH
-    ;mov dl, tb[2]
+    ;mov dl, VALID_UP
     ;add dl, '0'
     ;int 21H
     ;moveCursor 015H, 0FH
-    ;mov dl, tb[3]
+    ;mov dl, VALID_BOT
     ;add dl, '0'
     ;int 21H
 
