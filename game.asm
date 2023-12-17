@@ -34,6 +34,11 @@
 .model small
 .stack 64
 .data
+  GAME_MENU      EQU 1
+  CHATTING       EQU 2
+  RACING         EQU 3
+  TERMINATION    EQU 4
+  CURR_PAGE      DB  0               ; Used when checking if time has changed.code
   TIME_AUX       DB  0               ; Used when checking if time has changed.code
   min            db  2
   sec            db  2
@@ -69,6 +74,7 @@ main proc far
                 int  10h
                 call MAINMENU
   GameMenulabel:
+                mov CURR_PAGE, GAME_MENU
                 CALL GameMenu
   ;CALL getmode
                 cli
@@ -76,7 +82,7 @@ main proc far
                 mov  ax,cs
                 mov  ds,ax
                 mov  ax,2509h
-                lea  dx, CHECK_INPUT_UPDATES
+                lea  dx, KEYBOARD_INTERRUPT
                 int  21h
                 pop  ds
                 sti                                 ;Generate Track
@@ -87,21 +93,7 @@ main proc far
                 mov  AH, 2Ch                        ;initialize currentsec
                 int  21h
                 mov  TIME_SEC,dh
-  
-  ; ;;;;;; TESTING COLLISION ;;;;;;
-  ; mov AX, 0
-  ; mov CX, 25
-  ; mov DX, 85
-  ; call ADD_OBSTACLE
-  ; mov AX, 0
-  ; mov CX, 5
-  ; mov DX, 105
-  ; call ADD_OBSTACLE
-  ; mov AX, 0
-  ; mov CX, 5
-  ; mov DX, 65
-  ; call ADD_OBSTACLE
-
+                mov CURR_PAGE, RACING
   ;Get the systen time
   CHECK_TIME:   
                 mov  AH, 2Ch
@@ -137,6 +129,7 @@ main proc far
 
   ; Terminate Program
   terminate:    
+                mov CURR_PAGE, TERMINATION
                 call ALLLOST
                 call GETCARINFO
                 cmp  al,1
@@ -149,6 +142,48 @@ main proc far
   withoutdelay: call PlaySound
                 jmp  GameMenulabel
 main endp
+  ;-------------------------------------------------------
+KEYBOARD_INTERRUPT proc far
+  push AX
+  push BX
+  push CX
+  push DX
+  push SI
+  push DI
+  push DS
+  push ES
+  mov AL, CURR_PAGE
+  cmp AL, GAME_MENU
+  jnz SKIP_GAMEMENU_INPUT
+  ;; GAME_MENU
+  jmp EXIT_KEYBOARD_INTERRUPT
+  SKIP_GAMEMENU_INPUT:
+
+  cmp AL, RACING
+  jnz SKIP_RACE_INPUT
+  call CHECK_INPUT_UPDATES
+  jmp EXIT_KEYBOARD_INTERRUPT
+  SKIP_RACE_INPUT:
+
+  cmp AL, TERMINATION
+  jnz SKIP_TERMINATION_INPUT
+  ;; terminate
+  jmp EXIT_KEYBOARD_INTERRUPT
+  SKIP_TERMINATION_INPUT:
+  EXIT_KEYBOARD_INTERRUPT:
+  mov al,20h
+  out 20h,al
+  pop ES
+  pop DS
+  pop DI
+  pop SI
+  pop DX
+  pop CX
+  pop BX
+  pop AX
+  iret
+  ret
+KEYBOARD_INTERRUPT endp
   ;-------------------------------------------------------
 modify proc near
                 mov  cl,sec

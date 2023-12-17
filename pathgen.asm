@@ -60,7 +60,7 @@
     Boost_Percentage db 20               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
-    DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
+    DIRECTIONS       DB -1, 100 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
     FINAL_BLOCK      DB 0
     VALID_BOT      DB 0

@@ -126,14 +126,6 @@ GETCARINFO PROC FAR
   GETCARINFO ENDP
 ;-------------------------------------------------------
 CHECK_INPUT_UPDATES proc far
-  push AX
-  push BX
-  push CX
-  push DX
-  push SI
-  push DI
-  push DS
-  push ES
   in al, 60h ; read scan code
   cmp AL, 0
   jz EXIT_CHECK_INPUT_UPDATES
@@ -158,17 +150,7 @@ CHECK_INPUT_UPDATES proc far
   mov MAIN_KEY_PRESSED[1], AL
   mov SECOND_KEY_PRESSED[1], AH
   EXIT_CHECK_INPUT_UPDATES:
-  mov al,20h
-  out 20h,al
-  pop ES
-  pop DS
-  pop DI
-  pop SI
-  pop DX
-  pop CX
-  pop BX
-  pop AX
-  iret
+  ret
 CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
 READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEYS_STATUS

@@ -68,8 +68,7 @@ exit:
     CALL speaker_off
 
     ; return to DOS
-    MOV AX, 4C00h
-    INT 21h
+    ret
 
 ERROR:
     ; Handle file not found or other errors
