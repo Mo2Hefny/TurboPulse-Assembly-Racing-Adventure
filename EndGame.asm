@@ -11,6 +11,9 @@ xcursor equ 11h
 ycursor equ 05h
 p1size db 1
 p2size db 1
+p1score db 0
+p2score db 0
+scorestr db "Score "
 PWinimg db 'Pwin.bin', 0
 BothLimg db 'TimOt.bin', 0
 WhoWon db 0
@@ -80,6 +83,7 @@ END_GAME PROC FAR
     jz player2_name
     jmp exittotal
     player2_name:
+    inc p2score
     mov  bh, 0    ; page.
     lea  bp, p2name  ; offset.
     mov  bl, 0Bh ; default attribute.
@@ -94,8 +98,9 @@ END_GAME PROC FAR
     mov  ah, 13h    ; function.
     mov  al, 0h    ; sub-function.
     int  10h
-    jmp exittotal
+    jmp printscore
     player1_name:
+    inc p1score
     mov  bh, 0    ; page.
     lea  bp, p1name  ; offset.
     mov  bl, 012D ; default attribute.
@@ -110,6 +115,49 @@ END_GAME PROC FAR
     mov  ah, 13h    ; function.
     mov  al, 0h    ; sub-function.
     int  10h
+printscore: mov  bh, 0    ; page.
+    lea  bp, scorestr  ; offset.
+    mov  bl, 012D ; default attribute.
+    mov  cx, 0  ; char number.
+    mov  cl,6
+    mov  dl, xcursor    ; col.
+    sub dl,4
+    mov  dh, ycursor   ; row.
+    add dh,2
+    mov  ah, 13h    ; function.
+    mov  al, 0h    ; sub-function.
+    int  10h
+                      mov  bh,0
+                      MOV  AH,2
+                      mov  dl, xcursor                        ; col.
+                      add dl,2
+                      mov  dh, ycursor                        ;ROW
+                      add dh,2
+                      int  10h
+    mov bh,0
+    mov al,p1score
+    add al,'0'
+    mov ah,9
+    mov cx,1
+    mov bl,012D
+    int 10h
+      mov  bh,0
+                      MOV  AH,2
+                      mov  dl, xcursor                        ; col.
+                      add dl,3
+                      mov  dh, ycursor                        ;ROW
+                      add dh,2
+                      int  10h
+    mov dl,'-'
+    mov ah,2
+    int 21h
+      mov bh,0
+    mov al,p2score
+    add al,'0'
+    mov ah,9
+    mov cx,1
+    mov bl,0Bh
+    int 10h
     exittotal:
     pop ES
     ret
