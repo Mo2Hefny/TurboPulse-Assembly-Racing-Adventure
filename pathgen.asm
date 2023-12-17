@@ -8,8 +8,13 @@
     PUBLIC CLEAR_ENTITY
     PUBLIC CHECK_CAR_ON_PATH
     PUBLIC GET_BLOCK_DEPTH
+    PUBLIC HANDLE_DROP_POSITION
     PUBLIC xstart
     PUBLIC ystart
+    PUBLIC VALID_BOT
+    PUBLIC VALID_UP
+    PUBLIC DIR
+    PUBLIC DEP
 .model huge
 .stack 64
 .data
@@ -30,6 +35,7 @@
     GREEN                 EQU 02h
     RED                   EQU 0Ch
     WHITE                 EQU 0Fh
+    BLACK                 EQU 0
     UP EQU 0
     DOWN EQU 1
     RIGHT EQU 2
@@ -52,14 +58,18 @@
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 64000 DUP (?)    ;To save and Load Track
-    Block_Percentage db 30               ;real Percentage
+    Block_Percentage db 0               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 30               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 0               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 200 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
     CURR_BLOCK       DW 0
     FINAL_BLOCK      DB 0
+    VALID_BOT      DB 0
+    VALID_UP      DB 0
+    DIR      DB 0
+    DEP      DB 0
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -1256,4 +1266,302 @@ GET_BLOCK_DEPTH proc far
     ret
 GET_BLOCK_DEPTH endp
 ;-------------------------------------------------------
+GET_BLOCK_DIRECTION proc near
+    push BX
+    push CX
+    push DX
+    mov AX, CX
+    mov BL, BLOCK_WIDTH
+    div BL
+    mov AH, 0
+    mov CX, AX
+    mov AX, DX
+    mov BL, BLOCK_HEIGHT
+    div BL
+    mov AH, 0
+    mov BL, GRID_WIDTH
+    mul BL
+    add AX, CX                                          ; AX = GRID_INDEX
+    lea BX, GRID
+    add BX, AX
+    mov CL, [BX]
+    mov DEP, CL
+    lea BX, DIRECTIONS
+    add BX, AX
+    mov AH, 0
+    mov AL, [BX]
+    mov DIR, AL
+    pop DX
+    pop CX
+    pop BX
+    ret
+;-------------------------------------------------------
+CHECK_NEARBY_BOXES proc near
+    push CX
+    push DX
+    mov AH, 0dh
+    mov BH, 0
+    mov BL, 1
+    ; TOP LEFT
+    sub CX, 2
+    sub DX, 2
+    int 10h
+    cmp AL, BLACK
+    jz BOX_NEARBY
+    cmp AL, 1Fh
+    jz BOX_NEARBY
+    ; TOP RIGHT
+    add CX, 4
+    int 10h
+    cmp AL, BLACK
+    jz BOX_NEARBY
+    cmp AL, 1Fh
+    jz BOX_NEARBY
+    ; BOTTOM RIGHT
+    add DX, 4
+    int 10h
+    cmp AL, BLACK
+    jz BOX_NEARBY
+    cmp AL, 1Fh
+    jz BOX_NEARBY
+    ; BOTTOM LEFT
+    sub CX, 4
+    int 10h
+    cmp AL, BLACK
+    jz BOX_NEARBY
+    cmp AL, 1Fh
+    jz BOX_NEARBY
+    jmp EXIT_BOX_NEARBY
+    BOX_NEARBY:
+    mov BL, 0
+    EXIT_BOX_NEARBY:
+    pop DX
+    pop CX
+    ret
+CHECK_NEARBY_BOXES endp
+;-------------------------------------------------------
+HANDLE_DROP_POSITION proc far
+    ;call GET_BLOCK_DIRECTION
+    mov VALID_UP, 0
+    mov VALID_BOT, 0
+    call CHECK_NEARBY_BOXES
+    cmp BL, 0
+    jz EXIT_HANDLE_DROP_OBSTACLE
+    push CX
+    push DX
+    push AX
+    call GET_BLOCK_INDEX
+    pop AX                              ; GET BLOCK DIRECTION
+    mov DIR, AL
+    cmp AL, RIGHT
+    pop AX
+    pop BX
+    jnl SET_VERTICAL                    ; If direction is right or left skip
+    xchg AX, BX                         ; AX: X, BX: Y
+    call CHECK_VALID_DROP_V_LANES
+    mov BH, VALID_BOT
+    mov BL, VALID_UP
+    or BL, BH
+    mov CX, CURR_X
+    mov DX, CURR_Y
+    jmp EXIT_HANDLE_DROP_OBSTACLE
+    SET_VERTICAL:
+    call CHECK_VALID_DROP_H_LANES
+    mov CX, CURR_X
+    mov DX, CURR_Y
+    jmp EXIT_HANDLE_DROP_OBSTACLE
+
+    ; Changing AX only
+    EXIT_HANDLE_DROP_OBSTACLE:
+    mov BH, VALID_BOT
+    mov BL, VALID_UP
+    or BL, BH
+    ret
+HANDLE_DROP_POSITION endp
+;-------------------------------------------------------
+CHECK_VALID_DROP_V_LANES proc near            ; AX: X, BX: Y, CX: BLOCK_X, DX: BLOCK_Y
+    mov CURR_X, CX
+    mov CURR_Y, BX
+    sub AX, CX
+    ; CHECK LANE ONE
+    cmp AX, 7
+    jnl SKIP_V_LANE_1
+        mov BX, 3
+        add CURR_X, BX
+        jmp CHECK_V_LANE_2
+    SKIP_V_LANE_1:
+        push CX
+        mov DX, CURR_Y
+        add CX, 3
+        call SCAN_SECTION_V
+        or VALID_BOT, BL
+        sub DX, 10
+        call SCAN_SECTION_V
+        or VALID_UP, BL
+        pop CX
+    CHECK_V_LANE_2:
+    ; CHECK LANE TWO
+    cmp AX, 14
+    jnl SKIP_V_LANE_2
+    cmp AX, 7
+    jl SKIP_V_LANE_2
+        mov BX, 10
+        add CURR_X, BX
+        jmp CHECK_V_LANE_3
+    SKIP_V_LANE_2:
+        push CX
+        mov DX, CURR_Y
+        add CX, 10
+        call SCAN_SECTION_V
+        or VALID_BOT, BL
+        sub DX, 10
+        call SCAN_SECTION_V
+        or VALID_UP, BL
+        pop CX
+    CHECK_V_LANE_3:
+
+    ; CHECK LANE THREE
+    cmp AX, 20
+    jnl SKIP_V_LANE_3
+    cmp AX, 14
+    jl SKIP_V_LANE_3
+        mov BX, 17
+        add CURR_X, BX
+        jmp CHECK_V_LANE_4
+    SKIP_V_LANE_3:
+        push CX
+        mov DX, CURR_Y
+        add CX, 17
+        call SCAN_SECTION_V
+        or VALID_BOT, BL
+        sub DX, 10
+        call SCAN_SECTION_V
+        or VALID_UP, BL
+        pop CX
+    CHECK_V_LANE_4:
+    ret
+CHECK_VALID_DROP_V_LANES endp
+;-------------------------------------------------------
+CHECK_VALID_DROP_H_LANES proc near            ; AX: Y, BX: X, CX: BLOCK_X, DX: BLOCK_Y
+    mov CURR_X, BX
+    mov CURR_Y, DX
+    sub AX, DX
+    ; CHECK LANE ONE
+    cmp AX, 7
+    jnl SKIP_H_LANE_1
+        mov BX, 3
+        add CURR_Y, BX
+        jmp CHECK_H_LANE_2
+    SKIP_H_LANE_1:
+        push DX
+        mov CX, CURR_X
+        add DX, 3
+        call SCAN_SECTION_H
+        or VALID_BOT, BL
+        sub CX, 10
+        call SCAN_SECTION_H
+        or VALID_UP, BL
+        pop DX
+    CHECK_H_LANE_2:
+    ; CHECK LANE TWO
+    cmp AX, 14
+    jnl SKIP_H_LANE_2
+    cmp AX, 7
+    jl SKIP_H_LANE_2
+        mov BX, 10
+        add CURR_Y, BX
+        jmp CHECK_H_LANE_3
+    SKIP_H_LANE_2:
+        push DX
+        mov CX, CURR_X
+        add DX, 10
+        call SCAN_SECTION_H
+        or VALID_BOT, BL
+        sub CX, 10
+        call SCAN_SECTION_H
+        or VALID_UP, BL
+        pop DX
+    CHECK_H_LANE_3:
+
+    ; CHECK LANE THREE
+    cmp AX, 20
+    jnl SKIP_H_LANE_3
+    cmp AX, 14
+    jl SKIP_H_LANE_3
+        mov BX, 17
+        add CURR_Y, BX
+        jmp CHECK_H_LANE_4
+    SKIP_H_LANE_3:
+        push DX
+        mov CX, CURR_X
+        add DX, 17
+        call SCAN_SECTION_H
+        or VALID_BOT, BL
+        sub CX, 10
+        call SCAN_SECTION_H
+        or VALID_UP, BL
+        pop DX
+    CHECK_H_LANE_4:
+    ret
+CHECK_VALID_DROP_H_LANES endp
+;-------------------------------------------------------
+SCAN_SECTION_H proc near                         ; CX : starting X, DX: Y level
+    push AX
+    push CX
+    cmp CX, 0
+    jl EXIT_SCAN_TRACK_H
+    cmp CX, GAME_BORDER_X_MAX
+    jnl EXIT_SCAN_TRACK_H
+    mov AH, 0bh
+    mov BH, 0
+    mov SI, CX
+    add SI, 10
+    SCAN_H:
+            int 10h
+            cmp AL, BLACK
+            jz EXIT_SCAN_TRACK_H
+            inc CX
+            cmp CX, SI
+            jnz SCAN_H
+    EXIT_SCAN_TRACK_VALID:
+    mov BX, 1
+    pop CX
+    pop AX
+    ret
+    EXIT_SCAN_TRACK_H:
+    mov BX, 0
+    pop CX
+    pop AX
+    ret
+SCAN_SECTION_H endp
+;-------------------------------------------------------
+SCAN_SECTION_V proc near                           ; CX : X level, DX: starting Y
+    push AX
+    push DX
+    cmp DX, 0
+    jl EXIT_SCAN_TRACK_V
+    cmp DX, GAME_BORDER_Y_MAX
+    jnl EXIT_SCAN_TRACK_V
+    mov AH, 0bh
+    mov BH, 0
+    mov SI, DX
+    add SI, 10
+    SCAN_V:
+            int 10h
+            cmp AL, BLACK
+            jz EXIT_SCAN_TRACK_V
+            inc DX
+            cmp DX, SI
+            jnz SCAN_V
+    EXIT_SCAN_TRACK_V_VALID:
+    mov BX, 1
+    pop DX
+    pop AX
+    ret
+    EXIT_SCAN_TRACK_V:
+    mov BX, 0
+    pop DX
+    pop AX
+    ret
+SCAN_SECTION_V endp
 end
