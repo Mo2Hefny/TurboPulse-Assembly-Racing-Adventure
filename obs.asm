@@ -23,11 +23,11 @@
   DOWN_RIGHT EQU 7
   ; Variables
   ; 0 Obstacle, 1 Speed Boost, 2 Slow down, 3 Drop an Obstacle, 4 Pass through
-  MAX_ENTITIES_NUM EQU 100
+  MAX_ENTITIES_NUM EQU 110
   OLD_TIME_SEC DB 0
   RANDOM_SPAWN_TIME DB RANDOM_SPAWN
-  TYPE_WIDTH  DB 5, 5, 5, 5, 5, 5
-  TYPE_HEIGHT DB 5, 5, 5, 5, 5, 5
+  TYPE_WIDTH  DB 5, 5, 5, 5, 5
+  TYPE_HEIGHT DB 5, 5, 5, 5, 5
   TIRE_IMG        DB   0,   0,   0,   0,   0 
                   DB   0,   0,   0,   0,   0 
                   DB   0,   0, 1Fh,   0,   0
@@ -53,11 +53,6 @@
                   DB 35h, 34h, 34h, 34h, 35h
                   DB 36h, 34h, 34h, 34h, 36h
                   DB 36h, 35h, 34h, 35h, 36h
-  ROCKET_IMG      DB   0, 70h, 70h, 70h,   0
-                  DB   0, 70h, 64h, 70h,   0
-                  DB 70h, 64h, 28h, 64h, 70h
-                  DB 70h, 13h, 28h, 13h, 70h
-                  DB 13h, 2Bh, 13h, 2Bh, 13h
   ;TYPE1 DB 25 dup(09h)
   OLD_TIME_AUX DB 0
   ENTITIES_COUNT DW 0
@@ -117,6 +112,7 @@ RANDOM_SPAWN_ENTITY endp
 ;-------------------------------------------------------
 CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL: MOVEMENT_DIR, AH: CAN PASS
                                         ; Returns AX = 1, ZF = 1, DH = delta(X), DL = delta(Y) on collision
+  push DI
   mov PLAYER_DIRECTION, AL
   mov CAN_PASS, AH
   mov PLAYER_X, CX
@@ -135,13 +131,17 @@ CHECK_COLLISION proc far                ; CX: CAR_CenterX, [SI]: CAR_CenterY, AL
   mov AH, 0
   or AL, -1                            ; ZF = 0 since no collision has occured
   EXIT_CHECK_COLLISION:
+  pop DI
   ret
   COLLIDED:
+  mov CX, DI
+  pop DI
   cmp AH, 0
   ret
 CHECK_COLLISION endp
 ;-------------------------------------------------------
 CHECK_ENTITY_COLLISION proc near
+  mov DI, 0
   mov DL, CAR_HEIGHT
   mov DH, CAR_WIDTH
   mov AL, PLAYER_DIRECTION
@@ -168,7 +168,9 @@ CHECK_ENTITY_COLLISION proc near
   mov AX, [ENTITIES_X + BX]
   mov CX, PLAYER_X
   cmp AX, CX
+  mov DI, LEFT                          ; CL = 3 LEFT
   jnl ABSOLUTE_X
+  mov DI, RIGHT                         ; CL = 2 then Car is on the Entity's right side (RIGHT 2)
   xchg AX, CX
   ABSOLUTE_X:
   sub AX, CX
@@ -184,6 +186,7 @@ CHECK_ENTITY_COLLISION proc near
   mov CX, PLAYER_Y
   cmp AX, CX
   jnl ABSOLUTE_Y
+  add DI, 256                       ; BH = 1 then Car is below the Entity (DOWN 1)
   xchg AX, CX
   ABSOLUTE_Y:
   sub AX, CX
@@ -209,6 +212,8 @@ CHECK_ENTITY_COLLISION proc near
 CHECK_ENTITY_COLLISION endp
 ;-------------------------------------------------------
 HANDLE_OBSTACLE_COLLISION proc near
+  push BX
+  push DX
   mov AH, CAN_PASS
   cmp AH, 0
   jz CANT_PASS_THROUGH
@@ -221,6 +226,8 @@ HANDLE_OBSTACLE_COLLISION proc near
   CANT_PASS_THROUGH:
   xor AH, AH                           ; AH = 0 since a collision has occured
   mov AL, -1
+  pop DX
+  pop BX
   ret
 HANDLE_OBSTACLE_COLLISION endp
 ;-------------------------------------------------------
@@ -272,11 +279,6 @@ DRAW_ENTITIES proc far
     call DRAW_PASS_OBSTACLE
     jmp EXIT_DRAW_ENTITIES
     SKIP_PASS_OBSTACLE:
-    cmp AX, 5                           ; TYPE 0: Obstacle
-    jnz SKIP_ROCKET
-    call DRAW_ROCKET
-    jmp EXIT_DRAW_ENTITIES
-    SKIP_ROCKET:
 
     EXIT_DRAW_ENTITIES:
     ; Loop On The Next Obstacle
@@ -364,22 +366,6 @@ DRAW_PASS_OBSTACLE proc near
   pop BX
   ret
 DRAW_PASS_OBSTACLE endp
-;-------------------------------------------------------
-DRAW_ROCKET proc near
-  push BX
-  push AX
-  mov AL, TYPE_WIDTH[5]
-  mov AH, TYPE_HEIGHT[5]
-  mov CURR_ENTITY_WIDTH, AL
-  mov CURR_ENTITY_HEIGHT, AH
-  mov AL, 0
-  mov CURR_TRANSPARENT_COLOR, AL
-  lea SI, ROCKET_IMG
-  call DRAW_SELECTED_ENTITY
-  pop AX
-  pop BX
-  ret
-DRAW_ROCKET endp
 ;-------------------------------------------------------
 DRAW_SELECTED_ENTITY proc near
   ; Send coordinates to top left corner
