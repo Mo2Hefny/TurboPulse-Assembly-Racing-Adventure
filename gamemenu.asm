@@ -49,6 +49,8 @@ cmp INPUT, 1
 JZ CHAT
 cmp INPUT, 2
 JZ GAME
+cmp INPUT, 0
+JZ EXIT
 JMP BEGIN
 EXIT:mov  ax,4ch
      int  21H
@@ -96,7 +98,7 @@ GAME_MENU_INPUT proc far
     jz CHATTING
     cmp AL,03CH
     jz PLAY
-    CMP AL, 1
+    CMP AL, 81h                     ; Release of ESC
     JZ CLOSE_GAME
     jmp EXIT_GAME_MENU_INPUT
     CHATTING:

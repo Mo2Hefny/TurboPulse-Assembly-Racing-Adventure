@@ -43,11 +43,11 @@
                   DB 39h, 39h, 39h, 39h, 39h
                   DB 37h, 39h, 39h, 39h, 37h
                   DB 37h, 37h, 37h, 37h, 37h
-  DROP_TIRE_IMG   DB 12h, 12h, 18h, 12h, 12h
-                  DB 12h, 17h, 17h, 17h, 12h
+  DROP_TIRE_IMG   DB 11h, 11h, 18h, 11h, 11h
+                  DB 11h, 17h, 17h, 17h, 11h
                   DB 18h, 18h, 17h, 18h, 18h
-                  DB 12h, 18h, 18h, 18h, 12h
-                  DB 12h, 12h, 18h, 12h, 12h
+                  DB 11h, 18h, 18h, 18h, 11h
+                  DB 11h, 11h, 18h, 11h, 11h
   PASS_TIRE_IMG   DB 35h, 36h, 36h, 36h, 35h
                   DB 35h, 34h, 34h, 34h, 35h
                   DB 35h, 34h, 34h, 34h, 35h

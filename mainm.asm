@@ -27,7 +27,7 @@ p2actual db 0
 namesimg db 'MMenu.bin', 0
 buffer_size equ 64000
 emessage db   "error:reenter your name",'$'
-lenmessage db "only 15 chars allowed  "
+lenmessage db " only 15 chars allowed "
 
 IMAGE_HEIGHT equ 200;YOUR HEIGHT
 IMAGE_WIDTH equ 320;YOUR WIDTH
@@ -320,7 +320,7 @@ lenerror2:
     mov  bh, 0    ; page.
     lea  bp, lenmessage  ; offset.
     mov  bl,40h ; default attribute.
-    mov  cx, 21  ; char number.
+    mov  cx, 23  ; char number.
     mov  dl, 0ah    ; col.
     mov  dh, 0ah    ; row.
     mov  ah, 13h    ; function.
