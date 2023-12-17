@@ -1,3 +1,4 @@
+  EXTRN TEMP:WORD
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
   EXTRN TIME_SEC:BYTE
@@ -1031,6 +1032,15 @@ GET_TRACK_PROGRESS proc near
 GET_TRACK_PROGRESS endp
 ;-------------------------------------------------------
 LOAD_CARS proc far                        ; AL: Start Direction
+  mov CAR_WON, 0
+  mov CAR_PROGRESS, 0
+  mov CAR_PROGRESS[1], 0
+  mov CAR_POWER, 0
+  mov CAR_POWER[1], 0
+  mov MAIN_KEY_PRESSED, -1
+  mov MAIN_KEY_PRESSED[1], -1
+  mov SECOND_KEY_PRESSED, -1
+  mov SECOND_KEY_PRESSED[1], -1
   mov BX, xstart
   add BX, 5
   mov [CAR_X], BX

@@ -1,4 +1,6 @@
 PUBLIC GameMenu
+PUBLIC TEMP
+PUBLIC GAME_MENU_INPUT
 PUBLIC getmode
 EXTRN TRACK:FAR
 .model medium
@@ -7,6 +9,8 @@ EXTRN TRACK:FAR
 MAINMENUIMG db 'MMimg.bin', 0
 chatmodemsg   db  "Not Available yet",'$'
 GameModes db 0 ;1 for chat 2 for game
+TEMP DW 0
+INPUT DB -1
 buffer_size equ 64000
 IMAGE_HEIGHT equ 200;YOUR HEIGHT
 IMAGE_WIDTH equ 320;YOUR WIDTH
@@ -14,7 +18,6 @@ SCREEN_WIDTH equ 320
 SCREEN_HEIGHT equ 200
 ;---------------------------------------
 .code
-
 drawImage proc                                         ;Function To Load Track From array to Screen
                       mov  cx,0
                       mov  dx,0
@@ -40,14 +43,12 @@ drawImage proc                                         ;Function To Load Track F
 drawImage endp
 MODES PROC
 BEGIN:
-mov ah,0
-int 16h
-cmp AH,03BH
+cmp INPUT, -1
+jz BEGIN
+cmp INPUT, 1
 JZ CHAT
-CMP AH,03CH
+cmp INPUT, 2
 JZ GAME
-CMP AH,1
-JZ EXIT
 JMP BEGIN
 EXIT:mov  ax,4ch
      int  21H
@@ -71,7 +72,7 @@ getmode proc
 mov cl,GameModes
 getmode endp
 
-GameMenu proc
+GameMenu proc far
     mov ax,@data
     mov ds,ax
     mov ah, 03Dh
@@ -84,7 +85,31 @@ GameMenu proc
     mov dx, offset TRACK ; were to put read data
     int 21h
     CALL drawImage
+    mov INPUT, -1
     call MODES
     ret
 GameMenu endp
+;-------------------------------------------------------
+GAME_MENU_INPUT proc far
+    in al, 60h
+    cmp AL,03Bh
+    jz CHATTING
+    cmp AL,03CH
+    jz PLAY
+    CMP AL, 1
+    JZ CLOSE_GAME
+    jmp EXIT_GAME_MENU_INPUT
+    CHATTING:
+        mov INPUT, 1
+        jmp EXIT_GAME_MENU_INPUT
+    PLAY:
+        mov INPUT, 2
+        jmp EXIT_GAME_MENU_INPUT
+    CLOSE_GAME:
+        mov INPUT, 0
+        jmp EXIT_GAME_MENU_INPUT
+    EXIT_GAME_MENU_INPUT:
+    ret
+GAME_MENU_INPUT endp
+;-------------------------------------------------------
 end 

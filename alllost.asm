@@ -47,6 +47,7 @@ drawallost proc                                         ;Function To Load Track 
 drawallost endp
 
 ALLLOST PROC FAR
+    push ES
     MOV AX,@DATA
     MOV ds,AX
     mov es,ax
@@ -101,6 +102,8 @@ ALLLOST PROC FAR
     mov  ah, 13h    ; function.
     mov  al, 0h    ; sub-function.
     int  10h
-    exittotal:ret
+    exittotal:
+    pop ES
+    ret
 ALLLOST ENDP
 end 

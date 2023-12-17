@@ -7,7 +7,15 @@ sound_size DW 38000  ; size in bytes
 filename DB 'digdug.wav', 0
 buffer_size EQU 45000
 .CODE
-PlaySound PROC
+PlaySound PROC far
+    push AX
+    push BX
+    push CX
+    push DX
+    push SI
+    push DI
+    push DS
+    push ES
     MOV AX, @DATA
     MOV DS, AX
     MOV ES, AX
@@ -17,7 +25,6 @@ PlaySound PROC
     MOV DX, OFFSET filename ; ASCIIZ filename to open
     INT 21h            ; Call DOS interrupt
 
-    JC ERROR           ; If file not found, jump to error handler
     MOV BX, AX         ; Store file handle
 
     MOV AH, 3Fh        ; DOS function to read file
@@ -66,34 +73,48 @@ continue:
 
 exit:
     CALL speaker_off
+    call stop_fast_clock
 
     ; return to DOS
-    ret
-
-ERROR:
-    ; Handle file not found or other errors
-    JMP EXIT
-
-speaker_on:
+EXIT_PLAY_SOUND:
+    pop ES
+    pop DS
+    pop DI
+    pop SI
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    RET
+PlaySound endp
+;---------------------------------------
+speaker_on proc near
     IN AL, 61h
     OR AL, 2
     OUT 61h, AL
     RET
-
-speaker_off:
+speaker_on endp
+;---------------------------------------
+speaker_off proc near
     IN AL, 61h
     AND AL, 0FCh
     OUT 61h, AL
     RET
-
-delay:
+speaker_off endp
+;---------------------------------------
+delay proc near
+    push ES
     MOV DI, ES:[046Ch]  ; Accessing memory location ES:046Ch
+    pop ES
 _wait:
+    push ES
     CMP DI, ES:[046Ch]  ; Comparing with the value at ES:046Ch
+    pop ES
     JZ _wait
-    RET
-PlaySound endp
-change_timer_0 PROC
+    ret
+delay endp
+;---------------------------------------
+change_timer_0 PROC near
     CLI
     MOV AL, 00110110b
     OUT 43h, AL
@@ -102,8 +123,8 @@ change_timer_0 PROC
     STI
     RET
 change_timer_0 ENDP
-
-start_fast_clock PROC
+;---------------------------------------
+start_fast_clock PROC near
     CLI
     MOV AL, 00110110b
     OUT 43h, AL
@@ -114,4 +135,16 @@ start_fast_clock PROC
     STI
     RET
 start_fast_clock ENDP
+;---------------------------------------
+stop_fast_clock PROC near
+	cli
+	mov al, 36h
+	out 43h, al
+	mov al, 0h ; low 
+	out 40h, al
+	mov al, 0h ; high
+	out 40h, al
+	sti
+	ret
+stop_fast_clock ENDP
 end

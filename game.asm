@@ -3,6 +3,7 @@
   EXTRN Load_Track:FAR
   EXTRN pathlength:FAR
   ;GAMEMENU.ASM
+  EXTRN GAME_MENU_INPUT:FAR
   EXTRN GameMenu:FAR
   EXTRN getmode:FAR
   ; OBSTACLES.asm
@@ -40,8 +41,8 @@
   TERMINATION    EQU 4
   CURR_PAGE      DB  0               ; Used when checking if time has changed.code
   TIME_AUX       DB  0               ; Used when checking if time has changed.code
-  min            db  2
-  sec            db  2
+  min            db  0
+  sec            db  0
   TIME_SEC       DB  0               ; Used for updating time for games
   delay_seconds  db  0
   delay_secConst equ 3
@@ -73,10 +74,6 @@ main proc far
   ; 01h Blink enabled
                 int  10h
                 call MAINMENU
-  GameMenulabel:
-                mov CURR_PAGE, GAME_MENU
-                CALL GameMenu
-  ;CALL getmode
                 cli
                 push ds
                 mov  ax,cs
@@ -88,6 +85,12 @@ main proc far
                 sti                                 ;Generate Track
                 mov  AX, @data
                 mov  DS, AX
+  GameMenulabel:
+                mov CURR_PAGE, GAME_MENU
+                CALL GameMenu
+  ;CALL getmode
+                mov min, 2
+                mov sec, 3
                 call GENERATE_TRACK                 ; Return Starting Direction in AL
                 call LOAD_CARS
                 mov  AH, 2Ch                        ;initialize currentsec
@@ -155,7 +158,7 @@ KEYBOARD_INTERRUPT proc far
   mov AL, CURR_PAGE
   cmp AL, GAME_MENU
   jnz SKIP_GAMEMENU_INPUT
-  ;; GAME_MENU
+  call GAME_MENU_INPUT
   jmp EXIT_KEYBOARD_INTERRUPT
   SKIP_GAMEMENU_INPUT:
 
@@ -168,6 +171,7 @@ KEYBOARD_INTERRUPT proc far
   cmp AL, TERMINATION
   jnz SKIP_TERMINATION_INPUT
   ;; terminate
+  in al, 60h
   jmp EXIT_KEYBOARD_INTERRUPT
   SKIP_TERMINATION_INPUT:
   EXIT_KEYBOARD_INTERRUPT:
@@ -182,7 +186,6 @@ KEYBOARD_INTERRUPT proc far
   pop BX
   pop AX
   iret
-  ret
 KEYBOARD_INTERRUPT endp
   ;-------------------------------------------------------
 modify proc near
@@ -451,10 +454,7 @@ DisplayUI proc near
                 pop  BP
                 ret
 DisplayUI endp
-
-
-
-
+  ;-------------------------------------------------------
 convert proc                                        ;Convert Decimal Number to ASCI IN BUFFER TO BE PRINTED EASILY
                 push ax
                 push bx
@@ -493,7 +493,12 @@ convert proc                                        ;Convert Decimal Number to A
                 pop  ax
                 ret
 convert endp
-delay_proc PROC
+  ;-------------------------------------------------------
+delay_proc PROC near
+  push AX
+  push BX
+  push CX
+  push DX
                 mov  delay_seconds,delay_secConst
                 mov  AH, 2Ch
                 int  21h
@@ -507,6 +512,10 @@ delay_proc PROC
                 mov  al,dh
                 cmp  delay_seconds,0
                 jnz  labelloop
+  pop DX
+  pop CX
+  pop BX
+  pop AX
                 ret
 delay_proc ENDP
   ;-------------------------------------------------------
