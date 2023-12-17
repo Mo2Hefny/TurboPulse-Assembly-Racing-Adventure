@@ -23,7 +23,7 @@
   DOWN_RIGHT EQU 7
   ; Variables
   ; 0 Obstacle, 1 Speed Boost, 2 Slow down, 3 Drop an Obstacle, 4 Pass through
-  MAX_ENTITIES_NUM EQU 110
+  MAX_ENTITIES_NUM EQU 100
   OLD_TIME_SEC DB 0
   RANDOM_SPAWN_TIME DB RANDOM_SPAWN
   TYPE_WIDTH  DB 5, 5, 5, 5, 5

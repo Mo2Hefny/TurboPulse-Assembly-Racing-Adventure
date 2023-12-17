@@ -35,7 +35,7 @@
 .stack 64
 .data
   TIME_AUX       DB  0               ; Used when checking if time has changed.code
-  min            db  0
+  min            db  2
   sec            db  2
   TIME_SEC       DB  0               ; Used for updating time for games
   delay_seconds  db  0
