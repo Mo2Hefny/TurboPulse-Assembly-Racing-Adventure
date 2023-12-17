@@ -30,6 +30,7 @@
     WHITE_STRIP_HEIGHT    EQU 4
     GREY                  EQU 08h
     GREEN                 EQU 02h
+    BG                    EQU 12h
     RED                   EQU 0Ch
     WHITE                 EQU 0Fh
     BLACK                 EQU 0
@@ -156,7 +157,7 @@ RESET_BACKGROUND proc near
                       xor  AL, AL                       ; Clear entire screen
                       xor  CX, CX                       ; Upper left corner CH=row, CL=column
                       mov  DX, 134Fh                    ; lower right corner DH=row, DL=column
-                      mov  BH, GREEN                      ; Green-BackGround
+                      mov  BH, BG                       ; Green-BackGround
                       int  10h
                       mov  CX,1400h                       ; Upper left corner CH=row, CL=column
                       mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
@@ -750,6 +751,14 @@ DRAW_TRACK proc near
     push BX
     push AX
     call RESET_BACKGROUND             ;Resest Our Green BackGround
+    mov CX, xstart
+    mov DX, ystart
+    mov CURR_X, CX
+    mov CURR_Y, DX
+    call BORDER_UP
+    call BORDER_DOWN
+    call BORDER_LEFT
+    call BORDER_RIGHT
     mov GRID_INDEX, 0
     lea BX, GRID
     mov CX, 128
@@ -1203,7 +1212,7 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     mov AH, 0dh
     int 10h
     pop BX
-    cmp al, GREEN
+    cmp al, BG
     jz EXIT_CHECK_CAR_ON_PATH
     cmp al, RED
     jz EXIT_CHECK_CAR_ON_PATH
@@ -1233,7 +1242,7 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     add DX, 5
     mov AH, 0dh
     int 10h
-    cmp al, GREEN
+    cmp al, BG
     jz EXIT_CHECK_CAR_ON_PATH
     cmp al, RED
     jz EXIT_CHECK_CAR_ON_PATH

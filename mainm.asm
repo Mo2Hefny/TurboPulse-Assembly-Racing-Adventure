@@ -24,7 +24,7 @@ p1actual db 0
 p2name db 16 dup('$')
 p2actual db 0
 
-namesimg db 'b.bin', 0
+namesimg db 'MMenu.bin', 0
 buffer_size equ 64000
 emessage db   "error:reenter your name",'$'
 lenmessage db "only 15 chars allowed  "

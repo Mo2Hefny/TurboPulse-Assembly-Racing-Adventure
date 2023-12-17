@@ -59,6 +59,7 @@ endm
   WHITE_STRIP_HEIGHT    EQU 4
   GREY                  EQU 08h
   GREEN                 EQU 02h
+  BG                    EQU 12h
   RED                   EQU 0Ch
   UP EQU 0
   DOWN EQU 1
@@ -737,7 +738,7 @@ CHECK_PATH_COLLISION proc near
   CHECK_PATH:
   push AX
   call CHECK_CAR_ON_PATH
-  cmp al, GREEN
+  cmp al, BG
   jz PATH_COLLISION
   cmp al, RED
   jz PATH_COLLISION
@@ -807,7 +808,7 @@ CHECK_SEC_PATH_COLLISION proc near
   jmp CHECK_PATH_SEC
   CHECK_PATH_SEC:
   call CHECK_CAR_ON_PATH
-  cmp al, GREEN
+  cmp al, BG
   jz PATH_COLLISION_SEC
   cmp al, RED
   jz PATH_COLLISION_SEC

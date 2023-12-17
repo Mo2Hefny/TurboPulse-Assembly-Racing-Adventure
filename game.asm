@@ -25,8 +25,8 @@
   EXTRN p2actual:FAR
   ;sound
   EXTRN PlaySound:FAR
-  ;alllost.asm
-  EXTRN ALLLOST:FAR
+  ;END_GAME.asm
+  EXTRN END_GAME:FAR
   EXTRN CAR_WON:FAR
   EXTRN CAR_PROGRESS:FAR
   EXTRN CAR_POWER:FAR
@@ -46,15 +46,30 @@
   TIME_SEC       DB  0               ; Used for updating time for games
   delay_seconds  db  0
   delay_secConst equ 3
-  BoostUIMsg     db  "Power Ups:"
+  BoostUIMsg     db  "Power:"
   ProgressUIMsg  DB  "Progress:"
+  ClearPerc      DB  "  ",'$'  ;DONT YOU DARE REMOVE SPACES
   BOOST0NAME     DB  "No Power",'$'  ;DONT YOU DARE REMOVE SPACES
   BOOST1NAME     DB  "Nitro   ",'$'  ;DONT YOU DARE REMOVE SPACES
   BOOST2NAME     DB  "Frost   ",'$'  ;DONT YOU DARE REMOVE SPACES
   BOOST3NAME     DB  "Blockade",'$'  ;DONT YOU DARE REMOVE SPACES
   BOOST4NAME     DB  "Bypass  ",'$'  ;DONT YOU DARE REMOVE SPACES
   ProgressBuffer db  10 dup('$')     ; this is to print decimal numbers
-  slash          db  "/",'$'
+  perasci        db  "%",'$'
+  xc1            equ 132                                                        ;crown cursor
+  yc1            equ 165
+  xc2            equ 185
+  yc2            equ 165
+  cimgw          equ 10
+  cimgh          equ 7
+  currentleading db  0
+  leading        db  0
+  CRWONIMG       DB  162, 21, 21, 161, 21, 21, 162, 21, 21
+                 DB  162, 140, 140, 21, 140, 140, 21, 140, 162, 21, 140, 140
+                 DB  43, 162, 43, 140, 140, 43, 140, 140, 140, 161, 43, 43, 43
+                 DB  43, 43, 43, 43, 43, 140 ,21, 140, 43, 43, 43, 43, 43, 43
+                 DB  43, 162, 21, 140, 43, 43, 43, 43, 43, 43, 43, 21, 21, 162
+                 DB  140, 140, 140, 140, 140, 140, 140, 21
 .code
   ;-------------------------------------------------------
 main proc far
@@ -90,7 +105,7 @@ main proc far
                 CALL GameMenu
   ;CALL getmode
                 mov min, 2
-                mov sec, 3
+                mov sec, 1
                 call GENERATE_TRACK                 ; Return Starting Direction in AL
                 call LOAD_CARS
                 mov  AH, 2Ch                        ;initialize currentsec
@@ -117,6 +132,7 @@ main proc far
   call UPDATE_ENTITIES
   call UPDATE_CARS
   call DisplayUI
+  call setcurrentleading
   ; Draw
   call DRAW_ENTITIES
   ;call PRINT_TEST
@@ -133,7 +149,7 @@ main proc far
   ; Terminate Program
   terminate:    
                 mov CURR_PAGE, TERMINATION
-                call ALLLOST
+                call END_GAME
                 call GETCARINFO
                 cmp  al,1
                 jz   withoutdelay
@@ -242,219 +258,217 @@ dtime proc near
 dtime endp
   ;-------------------------------------------------------
 DisplayUI proc near
-                push BP
-                mov  ax,@data
-                mov  es,ax
+                      push BP
+                      mov  ax,@data
+                      mov  es,ax
   ; p1 name
-                mov  bh, 0                          ; page.
-                lea  bp, p1name                     ; offset.
-                mov  bl,012D                        ; default attribute.
-                mov  cx,0
-                mov  cl, byte ptr p1actual          ; char number.
-                mov  dl, 2h                         ; col.
-                mov  dh, 15h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
+                      mov  bh, 0                          ; page.
+                      lea  bp, p1name                     ; offset.
+                      mov  bl,012D                        ; default attribute.
+                      mov  cx,0
+                      mov  cl, byte ptr p1actual          ; char number.
+                      mov  dl, 0h                         ; col.
+                      mov  dh, 15h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
   ;p2 name
-                mov  bh, 0                          ; page.
-                lea  bp, p2name                     ; offset.
-                mov  bl,01D                         ; default attribute.
-                mov  cx,0
-                mov  cl, byte ptr p2actual          ; char number.
-                mov  dl, 1ah                        ; col.
-                mov  dh, 15h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
-  p1powerup:    
-                mov  bh, 0                          ; page.
-                lea  bp, BoostUIMsg                 ; offset.
-                mov  bl,0Fh                         ; default attribute.
-                mov  cx,0
-                mov  cl, 0ah                        ; char number.
-                mov  dl, 0h                         ; col.
-                mov  dh, 16h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
-                mov  dl, 0ah                        ; col.
-                mov  dh, 16h                        ; row.
-                MOV  AH,2
-                INT  10H
-                CALL GETCARINFO
-  NOBOOST:      CMP  CL,0
-                jnz  Nitro
-                mov  dx,offset BOOST0NAME
-                jmp  printboost
-  Nitro:        CMP  CL,1
-                jnz  Frost
-                mov  dx,offset BOOST1NAME
-                jmp  printboost
-  Frost:        CMP  CL,2
-                jnz  Block
-                mov  dx,offset BOOST2NAME
-                jmp  printboost
-  Block:        CMP  CL,3
-                jnz  Bypass
-                mov  dx,offset BOOST3NAME
-                jmp  printboost
-  Bypass:                                           ; CMP  CL,4
+                      mov  bh, 0                          ; page.
+                      lea  bp, p2name                     ; offset.
+                      mov  bl,0bh                         ; default attribute.
+                      mov  cx,0
+                      mov  cl, byte ptr p2actual          ; char number.
+                      mov  dl, 1ah                        ; col.
+                      mov  dh, 15h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
+  p1powerup:          
+                      mov  bh, 0                          ; page.
+                      lea  bp, BoostUIMsg                 ; offset.
+                      mov  bl,0Fh                         ; default attribute.
+                      mov  cx,0
+                      mov  cl, 0ah                        ; char number.
+                      mov  dl, 0h                         ; col.
+                      mov  dh, 17h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
+                      mov  dl, 06h                        ; col.
+                      mov  dh, 17h                        ; row.
+                      MOV  AH,2
+                      INT  10H
+                      CALL GETCARINFO
+  NOBOOST:            CMP  CL,0
+                      jnz  Nitro
+                      mov  dx,offset BOOST0NAME
+                      jmp  printboost
+  Nitro:              CMP  CL,1
+                      jnz  Frost
+                      mov  dx,offset BOOST1NAME
+                      jmp  printboost
+  Frost:              CMP  CL,2
+                      jnz  Block
+                      mov  dx,offset BOOST2NAME
+                      jmp  printboost
+  Block:              CMP  CL,3
+                      jnz  Bypass
+                      mov  dx,offset BOOST3NAME
+                      jmp  printboost
+  Bypass:                                                 ; CMP  CL,4
   ;              ; jnz  printboost
-                mov  dx,offset BOOST4NAME
-  printboost:   
-                MOV  AH,9
-                INT  21H
-  p2powerup:    
-                mov  bh, 0                          ; page.
-                lea  bp, BoostUIMsg                 ; offset.
-                mov  bl,0Fh                         ; default attribute.
-                mov  cx,0
-                mov  cl, 0ah                        ; char number.
-                mov  dl, 16h                        ; col.
-                mov  dh, 16h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
-                mov  dl, 20h                        ; col.
-                mov  dh, 16h                        ; row.
-                MOV  AH,2
-                INT  10H
-                CALL GETCARINFO
-  NOBOOST2:     CMP  CH,0
-                jnz  Nitro2
-                mov  dx,offset BOOST0NAME
-                jmp  printboost2
-  Nitro2:       CMP  CH,1
-                jnz  Frost2
-                mov  dx,offset BOOST1NAME
-                jmp  printboost2
-  Frost2:       CMP  CH,2
-                jnz  Block2
-                mov  dx,offset BOOST2NAME
-                jmp  printboost2
-  Block2:       CMP  CH,3
-                jnz  Bypass2
-                mov  dx,offset BOOST3NAME
-                jmp  printboost2
-  Bypass2:      CMP  CH,4
-                jnz  printboost2
-                mov  dx,offset BOOST4NAME
-  printboost2:  
-                MOV  AH,9
-                INT  21H
+                      mov  dx,offset BOOST4NAME
+  printboost:         
+                      MOV  AH,9
+                      INT  21H
+  p2powerup:          
+                      mov  bh, 0                          ; page.
+                      lea  bp, BoostUIMsg                 ; offset.
+                      mov  bl,0Fh                         ; default attribute.
+                      mov  cx,0
+                      mov  cl, 0ah                        ; char number.
+                      mov  dl, 1ah                        ; col.
+                      mov  dh, 17h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
+                      mov  dl, 20h                        ; col.
+                      mov  dh, 17h                        ; row.
+                      MOV  AH,2
+                      INT  10H
+                      CALL GETCARINFO
+  NOBOOST2:           CMP  CH,0
+                      jnz  Nitro2
+                      mov  dx,offset BOOST0NAME
+                      jmp  printboost2
+  Nitro2:             CMP  CH,1
+                      jnz  Frost2
+                      mov  dx,offset BOOST1NAME
+                      jmp  printboost2
+  Frost2:             CMP  CH,2
+                      jnz  Block2
+                      mov  dx,offset BOOST2NAME
+                      jmp  printboost2
+  Block2:             CMP  CH,3
+                      jnz  Bypass2
+                      mov  dx,offset BOOST3NAME
+                      jmp  printboost2
+  Bypass2:            CMP  CH,4
+                      jnz  printboost2
+                      mov  dx,offset BOOST4NAME
+  printboost2:        
+                      MOV  AH,9
+                      INT  21H
   ;p1progress
-                mov  bh, 0                          ; page.
-                lea  bp,ProgressUIMsg               ; offset.
-                mov  bl,0Fh                         ; default attribute.
-                mov  cx,0
-                mov  cl, 09h                        ; char number.
-                mov  dl, 0h                         ; col.
-                mov  dh, 18h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
+                      mov  bh, 0                          ; page.
+                      lea  bp,ProgressUIMsg               ; offset.
+                      mov  bl,012D                        ; default attribute.
+                      mov  cx,0
+                      mov  cl, 09h                        ; char number.
+                      mov  dl, 0h                         ; col.
+                      mov  dh, 18h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
   ;Conver Progress to ASCI
-                call GETCARINFO
-                mov  ax,0
-                mov  al,dl
-                mov  cx, 10                         ; Set divisor to 10 for decimal conversion
-                mov  bx, 10                         ; Set base to 10
-                call convert
+                      call GETCARINFO
+                      mov  ah,0
+                      mov  al,dl
+                      mov  bh,0
+                      mov  bl,pathlength
+                      sub  bl,3
+                      call calculatePercentage
+                      mov  bx,10
+                      mov  cx,10
+                      call convert
   ;set cursor
-                MOV  AH,2
-                mov  dl, 09h                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
+                      mov  bh,0
+                      MOV  AH,2
+                      mov  dl, 0ah                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
   ;print string
-                mov  bh,0
-                mov  dx,offset ProgressBuffer
-                mov  ah,9
-                int  21h
+                      mov  bh,0
+                      mov  dx,offset ClearPerc
+                      mov  ah,9
+                      int  21h
   ;set cursor
-                MOV  AH,2
-                mov  dl, 0bh                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
-  ;PRINT SLASH
-                mov  bh,0
-                mov  dx,offset slash
-                mov  ah,9
-                int  21h
-  ;SET CURSOR
-                MOV  AH,2
-                mov  dl, 0ch                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
-  ;Print Track Length
-                mov  ax,0
-                mov  al, byte ptr pathlength
-                sub  al,4                           ;FOR SOME REASON THERE IS ALWAYS A DIFFERNCE OF 4 BETWEEN PROGRESS AND TRACK LENGTH SO LAF2THA
-                mov  cx, 10                         ; Set divisor to 10 for decimal conversion
-                mov  bx, 10                         ; Set base to 10
-                call convert
-                mov  bh,0
-                mov  dx,offset ProgressBuffer
-                mov  ah,9
-                int  21h
+                      mov  bh,0
+                      MOV  AH,2
+                      mov  dl, 0ah                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
+  ;print string
+                      mov  bh,0
+                      mov  dx,offset ProgressBuffer
+                      mov  ah,9
+                      int  21h
+  ;set cursor
+                      MOV  AH,2
+                      mov  dl, 0ch                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
+  ;PRINT %
+                      mov  bh,0
+                      mov  dx,offset perasci
+                      mov  ah,9
+                      int  21h
   ;p2progress
-                mov  bh, 0                          ; page.
-                lea  bp,ProgressUIMsg               ; offset.
-                mov  bl,0Fh                         ; default attribute.
-                mov  cx,0
-                mov  cl, 09h                        ; char number.
-                mov  dl, 19h                        ; col.
-                mov  dh, 18h                        ; row.
-                mov  ah, 13h                        ; function.
-                mov  al, 0h                         ; sub-function.
-                int  10h
+                      mov  bh, 0                          ; page.
+                      lea  bp,ProgressUIMsg               ; offset.
+                      mov  bl,0bh                         ; default attribute.
+                      mov  cx,0
+                      mov  cl, 09h                        ; char number.
+                      mov  dl, 1ah                        ; col.
+                      mov  dh, 18h                        ; row.
+                      mov  ah, 13h                        ; function.
+                      mov  al, 0h                         ; sub-function.
+                      int  10h
   ;Conver Progress to ASCI
-                call GETCARINFO
-                mov  ax,0
-                mov  al,dh
-                mov  cx, 10                         ; Set divisor to 10 for decimal conversion
-                mov  bx, 10                         ; Set base to 10
-                call convert
+                      call GETCARINFO
+                      mov  ah,0
+                      mov  al,dh
+                      mov  bh,0
+                      mov  bl,pathlength
+                      sub  bl,3
+                      call calculatePercentage
+                      mov  bx,10
+                      mov  cx,10
+                      call convert
   ;set cursor
-                MOV  AH,2
-                mov  dl, 22h                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
+                      MOV  AH,2
+                      mov  dl, 24h                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
   ;print string
-                mov  bh,0
-                mov  dx,offset ProgressBuffer
-                mov  ah,9
-                int  21h
+                      mov  bh,0
+                      mov  dx,offset ClearPerc
+                      mov  ah,9
+                      int  21h
   ;set cursor
-                MOV  AH,2
-                mov  dl, 24h                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
-  ;PRINT SLASH
-                mov  bh,0
-                mov  dx,offset slash
-                mov  ah,9
-                int  21h
-  ;SET CURSOR
-                MOV  AH,2
-                mov  dl, 25h                        ; col.
-                mov  dh, 18h                        ;ROW
-                int  10h
-  ;Print Track Length
-                mov  ax,0
-                mov  al,byte ptr pathlength
-                sub  al,4                           ;FOR SOME REASON THERE IS ALWAYS A DIFFERNCE OF 4 BETWEEN PROGRESS AND TRACK LENGTH SO LAF2THA
-                mov  cx, 10                         ; Set divisor to 10 for decimal conversion
-                mov  bx, 10                         ; Set base to 10
-                call convert
-                mov  bh,0
-                mov  dx,offset ProgressBuffer
-                mov  ah,9
-                int  21h
-                pop  BP
-                ret
+                      MOV  AH,2
+                      mov  dl, 24h                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
+  ;print string
+                      mov  bh,0
+                      mov  dx,offset ProgressBuffer
+                      mov  ah,9
+                      int  21h
+  ;set cursor
+                      MOV  AH,2
+                      mov  dl, 26h                        ; col.
+                      mov  dh, 18h                        ;ROW
+                      int  10h
+  ;PRINT %
+                      mov  bh,0
+                      mov  dx,offset perasci
+                      mov  ah,9
+                      int  21h
+                      pop  BP
+                      ret
 DisplayUI endp
-  ;-------------------------------------------------------
+;-------------------------------------------------------
 convert proc                                        ;Convert Decimal Number to ASCI IN BUFFER TO BE PRINTED EASILY
                 push ax
                 push bx
@@ -518,5 +532,85 @@ delay_proc PROC near
   pop AX
                 ret
 delay_proc ENDP
+  ;-------------------------------------------------------
+calculatePercentage proc
+  ; Input: ax = num1, bx = num2
+  ; Output: result = (num1 * 100) / num2
+                      mov  dx,0
+                      mov  cx, 100                        ; Percentage factor
+                      imul cx                             ; Multiply num1 by 100
+                      idiv bx                             ; Divide by num2
+                      ret
+calculatePercentage endp
+  ;-------------------------------------------------------
+clean proc
+                      mov  al,0h
+                      mov  ah,0ch
+                      mov  bx,cx
+                      mov  di,dx
+                      add  di,cimgh
+                      add  bx,cimgw
+  rowcle:             
+                      int  10h
+                      inc  cx
+                      cmp  cx,bx
+                      jz   columncle
+                      jmp  rowcle
+  columncle:          
+                      sub  cx,cimgw
+                      inc  dx
+                      cmp  dx,di
+                      jz   exitcle
+                      jmp  rowcle
+  exitcle:            
+                      ret
+clean endp
+  ;-------------------------------------------------------
+drawcrown proc
+                      mov  bx,CX
+                      MOV  di,DX
+                      ADD  BX,cimgw
+                      ADD  DI,cimgh
+                      mov  ah,0ch
+                      mov  si,offset CRWONIMG
+  rowC:               mov  AL,[SI]
+                      int  10h
+                      inc  si
+                      inc  cx
+                      cmp  cx,bx
+                      jz   columnC
+                      jmp  rowC
+  columnC:            
+                      sub  cx,cimgw
+                      inc  dx
+                      cmp  dx,di
+                      jz   exitC
+                      jmp  rowC
+  exitC:              
+                      ret
+drawcrown endp
+  ;-------------------------------------------------------
+setcurrentleading proc
+                      mov CX, xc2
+                      mov DX, yc2
+                      call clean
+                      mov CX, xc1
+                      mov DX, yc1
+                      call clean
+                      call GETCARINFO
+                      cmp  dl,dh
+                      ja   p1crown
+                      jz   exitcrown
+                      mov CX, xc2
+                      mov DX, yc2
+                      call drawcrown
+                      jmp  exitcrown
+  p1crown:            
+                      mov CX, xc1
+                      mov DX, yc1
+                      call drawcrown
+
+  exitcrown:          ret
+setcurrentleading endp
   ;-------------------------------------------------------
 end main

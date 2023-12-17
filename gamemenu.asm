@@ -6,7 +6,7 @@ EXTRN TRACK:FAR
 .model medium
 .stack 64
 .data
-MAINMENUIMG db 'MMimg.bin', 0
+MAINMENUIMG db 'GMenu.bin', 0
 chatmodemsg   db  "Not Available yet",'$'
 GameModes db 0 ;1 for chat 2 for game
 TEMP DW 0
@@ -62,7 +62,7 @@ CHAT: mov GameModes,1
     mov  cx, 0  ; char number.
     mov  cl,017D
     mov  dl, 11    ; col.
-    mov  dh, 7   ; row.
+    mov  dh, 6   ; row.
     mov  ah, 13h    ; function.
     mov  al, 0h    ; sub-function.
     int  10h
