@@ -1198,6 +1198,8 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     jnl EXIT_CHECK_CAR_ON_PATH
     push BX
     call GET_BLOCK_INDEX
+    add CX, 5
+    add DX, 5
     mov AH, 0dh
     int 10h
     pop BX
@@ -1205,6 +1207,8 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     jz EXIT_CHECK_CAR_ON_PATH
     cmp al, RED
     jz EXIT_CHECK_CAR_ON_PATH
+    sub CX, 5
+    sub DX, 5
     ; CHECK NEXT CORNER
     sub DI, BLOCK_HEIGHT
     cmp DI, DX
@@ -1225,6 +1229,8 @@ CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER
     jl EXIT_CHECK_CAR_ON_PATH
     cmp CX, GAME_BORDER_X_MAX
     jnl EXIT_CHECK_CAR_ON_PATH
+    add CX, 5
+    add DX, 5
     mov AH, 0dh
     int 10h
     cmp al, GREEN
@@ -1254,6 +1260,9 @@ GET_BLOCK_INDEX endp
 ;-------------------------------------------------------
 GET_BLOCK_DEPTH proc far
     push BX
+    push CX
+    push DX
+    call GET_BLOCK_DIRECTION
     mov AX, CX
     mov BL, BLOCK_WIDTH
     div BL
@@ -1274,6 +1283,8 @@ GET_BLOCK_DEPTH proc far
     jg DIDNT_REACH_END
         mov AH, 1
     DIDNT_REACH_END:
+    pop DX
+    pop CX
     pop BX
     ret
 GET_BLOCK_DEPTH endp
