@@ -953,6 +953,7 @@ DROP_OBSTACLE proc near                   ; AL: MOVEMENT_DIR
   HANDLE_DROP_CAR1:
   cmp [SI], BH
   jz EXIT_DROP_OBSTACLE
+  mov [SI], BH
   mov BL, CURRENT_CAR
   mov CX, [CAR_X + BX]
   mov DX, [CAR_Y + BX]
@@ -978,11 +979,15 @@ DROP_OBSTACLE proc near                   ; AL: MOVEMENT_DIR
   SKIP_DROP_RIGHT:
   call HANDLE_DROP_POSITION               ; BL = 1 if valid
   cmp BL, 0
-  jz EXIT_DROP_OBSTACLE
-  mov BH, 0
-  mov [SI], BH
+  jz EXIT_DROP_OBSTACLE_NOT_VALID
   mov AX, 0
   call ADD_OBSTACLE
+  jmp EXIT_DROP_OBSTACLE
+  EXIT_DROP_OBSTACLE_NOT_VALID:
+  xor BX, BX
+  mov BL, CURRENT_CAR
+  shr BX, 1
+  mov [CAR_POWER + BX], 3
   EXIT_DROP_OBSTACLE:
   ret
 DROP_OBSTACLE endp
@@ -999,6 +1004,8 @@ UPDATE_POWERUPS proc near                 ; [SI]: POWERUPS_TIME
   mov AH, 1
   mov AL, 0
   UPDATE_POWERUPS_LOOP:
+    cmp CX, 1
+    jz DONT_LOWER_TIMER
     cmp [SI], AL
     jz DONT_LOWER_TIMER
     sub [SI], AH
@@ -1008,6 +1015,8 @@ UPDATE_POWERUPS proc near                 ; [SI]: POWERUPS_TIME
   lea SI, CAR2_POWERS_TIME
   mov CX, POWERUPS_COUNT
   UPDATE_POWERUPS_LOOP_2:
+    cmp CX, 1
+    jz DONT_LOWER_TIMER_2
     cmp [SI], AL
     jz DONT_LOWER_TIMER_2
     sub [SI], AH

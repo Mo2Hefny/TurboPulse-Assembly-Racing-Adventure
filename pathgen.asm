@@ -56,9 +56,9 @@
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
     TRACK            DB 64000 DUP (?)    ;To save and Load Track
-    Block_Percentage db 10               ;real Percentage
+    Block_Percentage db 0               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 20               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 10               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 100 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
@@ -66,6 +66,9 @@
     FINAL_BLOCK      DB 0
     VALID_BOT      DB 0
     VALID_UP      DB 0
+    VALID_LANE_1      DB 0
+    VALID_LANE_2      DB 0
+    VALID_LANE_3      DB 0
     ;;;;;;;;;;;;;;;; done
 
 .code
@@ -1344,7 +1347,7 @@ CHECK_NEARBY_BOXES proc near
     jz BOX_NEARBY
     cmp AL, 1Fh
     jz BOX_NEARBY
-    cmp AL, GREEN
+    cmp AL, BG
     jz BOX_NEARBY
     ; TOP RIGHT
     add CX, 4
@@ -1353,7 +1356,7 @@ CHECK_NEARBY_BOXES proc near
     jz BOX_NEARBY
     cmp AL, 1Fh
     jz BOX_NEARBY
-    cmp AL, GREEN
+    cmp AL, BG
     jz BOX_NEARBY
     ; BOTTOM RIGHT
     add DX, 4
@@ -1362,7 +1365,7 @@ CHECK_NEARBY_BOXES proc near
     jz BOX_NEARBY
     cmp AL, 1Fh
     jz BOX_NEARBY
-    cmp AL, GREEN
+    cmp AL, BG
     jz BOX_NEARBY
     ; BOTTOM LEFT
     sub CX, 4
@@ -1371,7 +1374,7 @@ CHECK_NEARBY_BOXES proc near
     jz BOX_NEARBY
     cmp AL, 1Fh
     jz BOX_NEARBY
-    cmp AL, GREEN
+    cmp AL, BG
     jz BOX_NEARBY
     jmp EXIT_BOX_NEARBY
     BOX_NEARBY:
@@ -1387,6 +1390,9 @@ HANDLE_DROP_POSITION proc far
     push SI
     mov VALID_UP, 0
     mov VALID_BOT, 0
+    mov VALID_LANE_1, 0
+    mov VALID_LANE_2, 0
+    mov VALID_LANE_3, 0
     call CHECK_NEARBY_BOXES
     cmp BL, 0
     jz EXIT_HANDLE_DROP_OBSTACLE
@@ -1399,6 +1405,9 @@ HANDLE_DROP_POSITION proc far
     cmp AL, 1
     pop AX
     pop BX
+    mov VALID_LANE_1, 1
+    mov VALID_LANE_2, 0
+    mov VALID_LANE_3, 1
     jnl SET_VERTICAL                    ; If direction is right or left skip
     xchg AX, BX                         ; AX: X, BX: Y
     call CHECK_VALID_DROP_V_LANES
@@ -1413,9 +1422,17 @@ HANDLE_DROP_POSITION proc far
 
     ; Changing AX only
     EXIT_HANDLE_DROP_OBSTACLE:
+    cmp VALID_LANE_2, 1
+    jz CHECK_WHOLE_LANE
     mov BH, VALID_BOT
     mov BL, VALID_UP
     and BL, BH
+    pop SI
+    ret
+    CHECK_WHOLE_LANE:
+    mov BH, VALID_LANE_1
+    mov BL, VALID_LANE_3
+    or BL, BH
     pop SI
     ret
 HANDLE_DROP_POSITION endp
@@ -1436,9 +1453,11 @@ CHECK_VALID_DROP_V_LANES proc near            ; AX: X, BX: Y, CX: BLOCK_X, DX: B
         add CX, 3
         call SCAN_SECTION_V
         or VALID_BOT, BL
+        and VALID_LANE_1, BL
         sub DX, 13
         call SCAN_SECTION_V
         or VALID_UP, BL
+        and VALID_LANE_1, BL
         pop CX
     CHECK_V_LANE_2:
     ; CHECK LANE TWO
@@ -1448,6 +1467,7 @@ CHECK_VALID_DROP_V_LANES proc near            ; AX: X, BX: Y, CX: BLOCK_X, DX: B
     jl SKIP_V_LANE_2
         mov BX, 10
         add CURR_X, BX
+        mov VALID_LANE_2, 1
         jmp CHECK_V_LANE_3
     SKIP_V_LANE_2:
         push CX
@@ -1475,9 +1495,11 @@ CHECK_VALID_DROP_V_LANES proc near            ; AX: X, BX: Y, CX: BLOCK_X, DX: B
         add CX, 17
         call SCAN_SECTION_V
         or VALID_BOT, BL
+        and VALID_LANE_3, BL
         sub DX, 13
         call SCAN_SECTION_V
         or VALID_UP, BL
+        and VALID_LANE_3, BL
         pop CX
     CHECK_V_LANE_4:
     ret
@@ -1499,9 +1521,11 @@ CHECK_VALID_DROP_H_LANES proc near            ; AX: Y, BX: X, CX: BLOCK_X, DX: B
         add DX, 3
         call SCAN_SECTION_H
         or VALID_BOT, BL
+        and VALID_LANE_1, BL
         sub CX, 13
         call SCAN_SECTION_H
         or VALID_UP, BL
+        and VALID_LANE_1, BL
         pop DX
     CHECK_H_LANE_2:
     ; CHECK LANE TWO
@@ -1511,6 +1535,7 @@ CHECK_VALID_DROP_H_LANES proc near            ; AX: Y, BX: X, CX: BLOCK_X, DX: B
     jl SKIP_H_LANE_2
         mov BX, 10
         add CURR_Y, BX
+        mov VALID_LANE_2, 1
         jmp CHECK_H_LANE_3
     SKIP_H_LANE_2:
         push DX
@@ -1538,9 +1563,11 @@ CHECK_VALID_DROP_H_LANES proc near            ; AX: Y, BX: X, CX: BLOCK_X, DX: B
         add DX, 17
         call SCAN_SECTION_H
         or VALID_BOT, BL
+        and VALID_LANE_3, BL
         sub CX, 13
         call SCAN_SECTION_H
         or VALID_UP, BL
+        and VALID_LANE_3, BL
         pop DX
     CHECK_H_LANE_4:
     ret
@@ -1605,4 +1632,5 @@ SCAN_SECTION_V proc near                           ; CX : X level, DX: starting 
     pop AX
     ret
 SCAN_SECTION_V endp
+;-------------------------------------------------------
 end
