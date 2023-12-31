@@ -1,6 +1,6 @@
   PUBLIC RECEIVE_INPUT
   PUBLIC WAIT_TILL_RECEIVE
-  PUBLIC RECIEVE_WORD
+  PUBLIC RECEIVE_WORD
   PUBLIC WAIT_TILL_RECEIVE_WORD
   PUBLIC RECEIVED
 .model compact
@@ -36,19 +36,19 @@ WAIT_TILL_RECEIVE proc far
   ret
 WAIT_TILL_RECEIVE endp
 ;----------------------------------------------------------
-RECIEVE_WORD proc far
+RECEIVE_WORD proc far
   call RECEIVE_INPUT
-  jz EXIT_RECIEVE_WORD
+  jz EXIT_RECEIVE_WORD
   mov AL, RECEIVED
   call WAIT_TILL_RECEIVE
   mov AH, RECEIVED
-  EXIT_RECIEVE_WORD:
+  EXIT_RECEIVE_WORD:
   ret
-RECIEVE_WORD endp
+RECEIVE_WORD endp
 ;----------------------------------------------------------
 WAIT_TILL_RECEIVE_WORD proc far
   DIDNT_RECEIVE_WORD:
-  call RECIEVE_WORD
+  call RECEIVE_WORD
   jz DIDNT_RECEIVE_WORD
   ret
 WAIT_TILL_RECEIVE_WORD endp

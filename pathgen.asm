@@ -19,7 +19,6 @@
     PUBLIC TRACK
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
-    PUBLIC RANDOM_SPAWN_POWERUP
     PUBLIC CLEAR_ENTITY
     PUBLIC CHECK_CAR_ON_PATH
     PUBLIC GET_BLOCK_DEPTH
@@ -27,6 +26,7 @@
     PUBLIC xstart
     PUBLIC ystart
     PUBLIC pathlength
+    PUBLIC ACTUAL_ENTITIES_COUNT
     PUBLIC ENTITIES_COUNT
     PUBLIC ENTITIES_TYPE
     PUBLIC ENTITIES_X
@@ -60,6 +60,7 @@
     FINISH EQU 4
     IsFinished EQU '.'
     MAX_ENTITIES_NUM EQU 500
+    MAX_RANDOM_SPAWN EQU 20
 
     direction        db ?                ; the randomized direction
 
@@ -81,9 +82,10 @@
     ENTITIES_X DW MAX_ENTITIES_NUM dup(-1)                            ; OBSTACLE_Center_X
     ENTITIES_Y DW MAX_ENTITIES_NUM dup(-1)                            ; OBSTACLE_Center_Y
     ENTITIES_COUNT DW 0
-    Block_Percentage db 0               ;real Percentage
+    ACTUAL_ENTITIES_COUNT DW 0
+    Block_Percentage db 10               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 0               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 10               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 100 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
@@ -282,7 +284,8 @@ GET_GRID_INDEX proc near
     ret
 GET_GRID_INDEX endp
 ;-------------------------------------------------------
-RANDOM_SPAWN_POWERUP proc far
+RANDOM_SPAWN_POWERUP proc near
+  mov VALID_BOT, MAX_RANDOM_SPAWN
   RANDOM_SPAWN_LOOP:
   mov CX, 0
   mov DX, 0
@@ -294,14 +297,13 @@ RANDOM_SPAWN_POWERUP proc far
   mov BH, BLOCK_HEIGHT
   call GET_RANDOM_INDEX             ; 16 options, mul by 20
   add DX, AX
-  ; CHECK IF AVAILABLE
-  mov AH, 0Dh
-  int 10h
-  cmp AL, RED
-  jz RANDOM_SPAWN_LOOP
-  cmp AL, GREEN
-  jz RANDOM_SPAWN_LOOP
+  call far ptr GET_BLOCK_DEPTH
+  ; CHECK IF VALID
+  cmp AL, 0
+  jl RANDOM_SPAWN_LOOP
   call SPAWN_POWERUP
+  dec [VALID_BOT]
+  jnl RANDOM_SPAWN_LOOP
   ret
 RANDOM_SPAWN_POWERUP endp
 ;-------------------------------------------------------
@@ -355,7 +357,6 @@ Load_Track proc                                         ;Function To Load Track 
 Load_Track endp
 ;-------------------------------------------------------
 SPAWN_POWERUP proc near
-  ;push DI
   mov bx, 0703h
   call GET_RANDOM_INDEX             ; 3 options, mul by 5
                                     ; 0, 5, 10
@@ -369,17 +370,12 @@ SPAWN_POWERUP proc near
   mov bl, 4                         ; 4 options
   CALL RANDOM_NUMBER
   mov al, ah
-  inc al
+  add al, 11
   ; CHECK IF AVAILABLE
   mov DI, AX
   mov BH, 0
   mov AH, 0Dh
   int 10h
-  cmp AL, GREY
-  jz VALID_SPAWN_LOCATION
-  cmp AL, WHITE
-  jz VALID_SPAWN_LOCATION
-  jmp EXIT_SPAWN_POWERUP
   VALID_SPAWN_LOCATION:
   mov AX, DI
   push AX
@@ -390,7 +386,6 @@ SPAWN_POWERUP proc near
   pop CX
   pop AX
   EXIT_SPAWN_POWERUP:
-  ;pop DI
   ret
 SPAWN_POWERUP endp
 ;-------------------------------------------------------
@@ -731,19 +726,7 @@ GENERATE_TRACK proc far
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
-                      MOV  boolFinished, 1
-                      mov AX, CURR_BLOCK
-                      dec AX
-                      mov FINAL_BLOCK, AL
-                      mov al, FINISH
-                      call STORE_DIRECTION
-                      ; Send track to other player
-                      call SEND_TRACK
-                      call DRAW_TRACK
-                      call DECORATE_TRACK
-                      ;CALL CREATE_BLOCK                 ; Draw Our Final RedSqaure To Represnt End Line
-                      call Save_Track                   ; Save Track in Array For Further Usage
-                      mov al, DIRECTIONS                ; Store first direction for cars starting direction
+                      call FINISH_TRACK
                       ;HLT
                       ret
 GENERATE_TRACK endp
@@ -760,6 +743,37 @@ STORE_DIRECTION proc near
     pop BX
     ret
 STORE_DIRECTION endp
+;-------------------------------------------------------
+FINISH_TRACK proc near
+    
+    MOV  boolFinished, 1
+    mov AX, CURR_BLOCK
+    dec AX
+    mov FINAL_BLOCK, AL
+    mov al, FINISH
+    call STORE_DIRECTION
+    mov AX, ENTITIES_COUNT
+    mov ACTUAL_ENTITIES_COUNT, AX
+    call RANDOM_SPAWN_POWERUP
+    
+    ; Send track to other player
+    call RECEIVE_INPUT
+    jz FINISHED_FIRST
+      mov AL, RECEIVED
+      cmp AL, IsFinished
+      jnz FINISHED_FIRST
+      call RESET_TRACK
+      call RECEIVE_TRACK
+      ret
+    FINISHED_FIRST:
+    call SEND_TRACK
+    call DRAW_TRACK
+    call DECORATE_TRACK
+    ;CALL CREATE_BLOCK                 ; Draw Our Final RedSqaure To Represnt End Line
+    call Save_Track                   ; Save Track in Array For Further Usage
+    mov al, DIRECTIONS                ; Store first direction for cars starting direction
+    ret
+FINISH_TRACK endp
 ;-------------------------------------------------------
 SEND_TRACK proc near
     SEND_FINISHED:
@@ -801,6 +815,8 @@ SEND_TRACK proc near
         jnz SEND_GRID_DIRECTIONS
     ; Send All Entities
     mov AX, ENTITIES_COUNT
+    call WAIT_TILL_SEND_WORD
+    mov AX, ACTUAL_ENTITIES_COUNT
     call WAIT_TILL_SEND_WORD
     mov CX, 0
     lea BX, ENTITIES_TYPE
@@ -861,6 +877,8 @@ RECEIVE_TRACK proc near
     ; Receive all entities
     call WAIT_TILL_RECEIVE_WORD
     mov ENTITIES_COUNT, AX
+    call WAIT_TILL_RECEIVE_WORD
+    mov ACTUAL_ENTITIES_COUNT, AX
     mov CX, 0
     lea BX, ENTITIES_TYPE
     lea SI, ENTITIES_X
@@ -1364,7 +1382,7 @@ END_BLOCK_H endp
 ;-------------------------------------------------------
 ;------------------- GAME LOGIC -----------------------;
 CHECK_CAR_ON_PATH proc far              ; CX: X_FIRST_CORNER, DX: Y_FIRST_CORNER, BX: X_SEC_CORNER, DI: Y_SEC_CORNER
-    mov AL, GREEN
+    mov AL, BG
     cmp DX, 0
     jl EXIT_CHECK_CAR_ON_PATH
     cmp DX, GAME_BORDER_Y_MAX
