@@ -518,6 +518,19 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   SKIP_ACC_CHECKS:
   ; Position = Position + (Velocity + Boost) * Acceleration
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
+  mov AX, 0
+  cmp [DI], AX
+  jnl not_neg
+    mov AX, -1
+    jmp acc
+  not_neg:
+  jnz not_equal
+    mov AX, 0
+    jmp acc
+  not_equal:
+    mov AX, 1
+  acc:
+  mov [DI], AX
   call USE_SPEED_RELATED_POWERUP
   mov AX, [DI]
   imul BL                               ; (Velocity + Boost) * Acceleration(DX)
@@ -525,17 +538,17 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   ;sub DL, OLD_TIME_AUX                 ; delta(T) = New T - Old T
   ;mul DL                               ; (Velocity + Boost) * Acceleration(DX) * delta(T)
                                         ; NOT WORKING XD
-  mov CL, 3                            
-  SAR AX, CL                            ; To make acceleration smaller
+  ;mov CL, 3                            
+  ;SAR AX, CL                            ; To make acceleration smaller
   mov CURRENT_MAIN_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
-  cmp AX, 0
-  jnl SKIP_FIXING_ACC
-  mov BL, -1
-  imul BL
-  SKIP_FIXING_ACC:
-  mov BL, 2
-  idiv BL
-  CBW
+  ;cmp AX, 0
+  ;jnl SKIP_FIXING_ACC
+  ;mov BL, -1
+  ;imul BL
+  ;SKIP_FIXING_ACC:
+  ;mov BL, 2
+  ;idiv BL
+  ;CBW
   mov CURRENT_SEC_VELOCITY, AX
   ret
 HANDLE_ACCELERATION endp
