@@ -59,7 +59,6 @@ SEND_INPUT proc far             ; ZF = 1 if nothing RECEIVED, 0 otherwise
   mov dx , 3F8H		; Transmit data register
   mov al ,SEND
   out dx , al
-  XOR SERIAL_STATUS , 00000001b
   MOV AL, 0
   ADD AL, 1
   EXIT_SEND_INPUT:

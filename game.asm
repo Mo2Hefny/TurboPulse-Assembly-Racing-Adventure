@@ -18,6 +18,7 @@
   EXTRN UPDATE_CARS:FAR
   EXTRN LOAD_CARS:FAR
   EXTRN RESET_CARS:FAR
+  EXTRN PLAYER_NUMBER:BYTE
   ;mainmenu.asm
   EXTRN MAINMENU:FAR
   EXTRN p1name:FAR
@@ -122,6 +123,7 @@ main proc far
                 int  21h
                 mov  TIME_SEC,dh
                 mov CURR_PAGE, RACING
+                call RECEIVE_INPUT
   ;Get the systen time
   CHECK_TIME:   
                 mov  AH, 2Ch
@@ -145,7 +147,7 @@ main proc far
   call setcurrentleading
   ; Draw
   call DRAW_ENTITIES
-  call PRINT_TEST
+  ;call PRINT_TEST
   call DRAW_CARS
   
   ; Repeat the process

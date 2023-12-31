@@ -26,6 +26,7 @@
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
+  EXTRN SPAWN_ENTITY:BYTE
   ; PUBLIC
   PUBLIC CHECK_INPUT_UPDATES
   PUBLIC GETCARINFO
@@ -45,7 +46,7 @@
     mov ah, 2H
     int 10h  
 endm
-.model small
+.model compact
 .data
   ; Red Car
   img1  DB 184, 113, 6, 137, 233, 184, 113, 6, 137, 136, 235, 6, 41, 137, 21, 235, 6, 41, 137, 21, 170, 161, 138, 163, 170, 244, 27, 75, 74, 20, 113, 137, 163, 138, 137, 112, 4, 6, 6, 136 
@@ -59,8 +60,8 @@ endm
   CAR_WIDTH             EQU 05h               ; The width of all cars
   CAR_HEIGHT            EQU 09h               ; The height of all cars
   CAR_SPEED             EQU 2
-  ACCELERATION_INCREASE EQU 2
-  ACCELERATION_DECREASE EQU 1
+  ACCELERATION_INCREASE EQU 8
+  ACCELERATION_DECREASE EQU 8
   MAX_ACCELERATION      EQU 8
   
   GAME_BORDER_X_MIN     EQU 0                ; track boundries
@@ -91,17 +92,20 @@ endm
   POWERUPS_COUNT EQU 4
 
   ; Variables
-  PLAYER_NUMBER DB 0
+  PLAYER_NUMBER DB 1
   OLD_TIME_AUX DB 0
   OLD_TIME_SEC DB 0
   OLD_X DW ?
   OLD_Y DW ?
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
+  POWER_USED DB ?
   CURRENT_MOVEMENT DB ?
   CURRENT_MAIN_VELOCITY DW ?
   CURRENT_SEC_VELOCITY DW ?
   CAR_WON DB 0                                        ; 1 First car, 2 Second car
+  t DB 0                                        ; 1 First car, 2 Second car
+  y DB 0                                        ; 1 First car, 2 Second car
 
   CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
   CAR_Y DW 3Ah, 3Ah                                   ; CenterY position of player1, player2
@@ -157,7 +161,6 @@ CHECK_INPUT_UPDATES proc far
   call READ_BUFFER
   mov MAIN_KEY_PRESSED[0], AL
   mov SECOND_KEY_PRESSED[0], AH
-  call SEND_SERIAL_INPUT
   EXIT_CHECK_INPUT_UPDATES:
   call CHECK_SERIAL_INPUT
   ret
@@ -185,6 +188,7 @@ READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEY
   
   and CL, 1                             ; 1 if pressed, 0 if released
   call HANDLE_KEYS_PRIORITY
+  call SEND_MOVEMENT_SERIAL_INPUT
   EXIT_READ_KEYBOARD:
     ret
 READ_BUFFER endp
@@ -253,9 +257,52 @@ SEND_SERIAL_INPUT proc near
   ret
 SEND_SERIAL_INPUT endp
 ;-------------------------------------------------------
+SEND_MOVEMENT_SERIAL_INPUT proc near    ; AL: MAIN_MOVEMENT, AH: SECONDARY_MOVEMENT
+  ; [?00][?00][00]
+  push AX
+  push CX
+  mov CL, 3
+  shl AL, CL
+  and AH, 111b
+  or AL, AH
+  mov CL, 2
+  shl AL, CL
+  mov SEND, AL
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  pop CX
+  pop AX
+  ret
+SEND_MOVEMENT_SERIAL_INPUT endp
+;-------------------------------------------------------
+SEND_POWER_SERIAL_INPUT proc near
+  ; [?00][?00][01]
+  mov SEND, 10000001b
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  ret
+SEND_POWER_SERIAL_INPUT endp
+;-------------------------------------------------------
 CHECK_SERIAL_INPUT proc near
   call RECEIVE_INPUT
   jz EXIT_CHECK_SERIAL_INPUT
+  mov AL, RECEIVED
+  and AL, 11b
+  cmp AL, 0                                       ; [?XX][?XX][00]
+  jnz SKIP_MOVEMENT_READ
+  call RECEIVE_MOVEMENT_SERIAL_INPUT
+  ret
+  SKIP_MOVEMENT_READ:
+  cmp AL, 1                                       ; [?XX][?XX][01]
+  jnz SKIP_POWER_READ
+  caLL RECEIVE_POWER_SERIAL_INPUT
+  ret
+  SKIP_POWER_READ:
+  EXIT_CHECK_SERIAL_INPUT:
+  ret
+CHECK_SERIAL_INPUT endp
+;-------------------------------------------------------
+RECEIVE_MOVEMENT_SERIAL_INPUT proc near
   mov AL, RECEIVED
   mov AH, AL
   and AH, 11100000b
@@ -275,9 +322,20 @@ CHECK_SERIAL_INPUT proc near
   jge SKIP_SERIAL_SECOND
   mov SECOND_KEY_PRESSED[1], AH
   SKIP_SERIAL_SECOND:
-  EXIT_CHECK_SERIAL_INPUT:
   ret
-CHECK_SERIAL_INPUT endp
+RECEIVE_MOVEMENT_SERIAL_INPUT endp
+;-------------------------------------------------------
+RECEIVE_POWER_SERIAL_INPUT proc near
+  mov AL, RECEIVED
+  mov AH, AL
+  and AH, 10000000b
+  cmp AH, 10000000b
+  jnz SKIP_SERIAL_POWER_ACTIVATE
+  lea SI, CAR2_POWERS_TIME
+  call USE_POWERUP
+  SKIP_SERIAL_POWER_ACTIVATE:
+  ret
+RECEIVE_POWER_SERIAL_INPUT endp
 ;-------------------------------------------------------
 ;---------------- HANDLE CAR UPDATES ------------------;
 UPDATE_CARS proc far
@@ -297,8 +355,6 @@ UPDATE_CARS proc far
   mov AL, 2
   mov CURRENT_CAR, AL
   call UPDATE_CAR
-
-  call CHECK_SERIAL_INPUT
 
   call UPDATE_POWERUPS
   EXIT_UPDATE_CARS:
@@ -980,6 +1036,7 @@ USE_POWERUP proc near                     ; [SI]: POWERUPS_TIME
   add SI, BX
   mov AH, 5
   mov [SI], AH                      ; Update Powerup Time
+  call SEND_POWER_SERIAL_INPUT
   EXIT_USE_POWERUP:
   ret
 USE_POWERUP endp
@@ -1115,7 +1172,7 @@ RESET_CARS proc far
   mov MAIN_KEY_PRESSED[1], -1
   mov SECOND_KEY_PRESSED, -1
   mov SECOND_KEY_PRESSED[1], -1
-  mov PLAYER_NUMBER, 0
+  mov PLAYER_NUMBER, 1
   ret
 RESET_CARS endp
 ;-------------------------------------------------------
@@ -1125,7 +1182,7 @@ LOAD_CARS proc far                        ; AL: Start Direction
   mov CX, BX
   add BX, 9
   mov DX, BX
-  mov AH, 0
+  mov AH, 1
   cmp PLAYER_NUMBER, AH
   jz PLAYER_ONE_COOR_X
     xchg CX, DX
@@ -1333,15 +1390,15 @@ PRINT_TEST proc far
 
     moveCursor 0CH, 02H
     mov ah, 2h
-    mov dl, MAIN_KEY_PRESSED
+    mov dl, SPAWN_ENTITY
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, SECOND_KEY_PRESSED
+    mov dl, t
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, MAIN_KEY_PRESSED[1]
+    mov dl, y
     add dl, '0'
     int 21H
     moveCursor 015H, 02H

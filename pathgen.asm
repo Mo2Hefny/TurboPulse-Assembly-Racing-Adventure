@@ -83,7 +83,7 @@
     ENTITIES_COUNT DW 0
     Block_Percentage db 0               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
-    Boost_Percentage db 10               ;100-this Percentage so if 90 its 10
+    Boost_Percentage db 0               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 100 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
@@ -382,7 +382,13 @@ SPAWN_POWERUP proc near
   jmp EXIT_SPAWN_POWERUP
   VALID_SPAWN_LOCATION:
   mov AX, DI
+  push AX
+  push CX
+  push DX
   call ADD_OBSTACLE
+  pop DX
+  pop CX
+  pop AX
   EXIT_SPAWN_POWERUP:
   ;pop DI
   ret
@@ -477,6 +483,7 @@ GENERATE_TRACK proc far
 
                       mov  AX, @data
                       mov  DS, AX
+                      mov  ES, AX
                       xor BX, BX
     ; Initialize Video Mode
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
@@ -724,7 +731,6 @@ GENERATE_TRACK proc far
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
-                      mov PLAYER_NUMBER, 1
                       MOV  boolFinished, 1
                       mov AX, CURR_BLOCK
                       dec AX
@@ -774,6 +780,9 @@ SEND_TRACK proc near
     mov AL, FINAL_BLOCK
     mov SEND, AL
     call WAIT_TILL_SEND
+    mov AL, pathlength
+    mov SEND, AL
+    call WAIT_TILL_SEND
     ; SEND START X and Y
     mov AX, xstart
     call WAIT_TILL_SEND_WORD
@@ -806,7 +815,7 @@ SEND_TRACK proc near
         add SI, 2
         mov AX, [DI]
         call WAIT_TILL_SEND_WORD
-        add DX, 2
+        add DI, 2
         inc CX
         cmp CX, MAX_ENTITIES_NUM
         jnz SEND_ENTITIES
@@ -814,6 +823,7 @@ SEND_TRACK proc near
 SEND_TRACK endp
 ;-------------------------------------------------------
 RECEIVE_TRACK proc near
+    mov PLAYER_NUMBER, 2
     ; Make counter for grid
     mov CX, 0
     lea BX, GRID
@@ -829,6 +839,9 @@ RECEIVE_TRACK proc near
     call WAIT_TILL_RECEIVE
     mov AL, RECEIVED
     mov FINAL_BLOCK, AL
+    call WAIT_TILL_RECEIVE
+    mov AL, RECEIVED
+    mov pathlength, AL
     ; Receive START X and Y
     call WAIT_TILL_RECEIVE_WORD
     mov xstart, AX
@@ -861,7 +874,7 @@ RECEIVE_TRACK proc near
         add SI, 2
         call WAIT_TILL_RECEIVE_WORD
         mov [DI], AX
-        add DX, 2
+        add DI, 2
         inc CX
         cmp CX, MAX_ENTITIES_NUM
         jnz RECEIVE_ENTITIES
