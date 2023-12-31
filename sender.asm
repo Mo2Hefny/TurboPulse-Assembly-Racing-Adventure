@@ -1,6 +1,8 @@
   PUBLIC CONFIG_PORT
   PUBLIC SEND_INPUT
   PUBLIC WAIT_TILL_SEND
+  PUBLIC SEND_WORD
+  PUBLIC WAIT_TILL_SEND_WORD
   PUBLIC SERIAL_STATUS
   PUBLIC SEND
 .model compact
@@ -72,5 +74,22 @@ WAIT_TILL_SEND proc far
   jz DIDNT_SEND
   ret
 WAIT_TILL_SEND endp
+;----------------------------------------------------------
+SEND_WORD proc far
+  mov SEND, AL
+  call SEND_INPUT
+  jz EXIT_SEND_WORD
+  mov SEND, AH
+  call WAIT_TILL_SEND
+  EXIT_SEND_WORD:
+  ret
+SEND_WORD endp
+;----------------------------------------------------------
+WAIT_TILL_SEND_WORD proc far
+  DIDNT_SEND_WORD:
+  call SEND_WORD
+  jz DIDNT_SEND_WORD
+  ret
+WAIT_TILL_SEND_WORD endp
 ;----------------------------------------------------------
 end

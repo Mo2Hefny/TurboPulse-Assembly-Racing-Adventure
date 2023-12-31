@@ -2,6 +2,20 @@
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
   EXTRN TIME_SEC:BYTE
+    ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN WAIT_TILL_SEND:FAR
+  EXTRN SEND_WORD:FAR
+  EXTRN WAIT_TILL_SEND_WORD:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN WAIT_TILL_RECEIVE:FAR
+  EXTRN RECEIVE_WORD:FAR
+  EXTRN WAIT_TILL_RECEIVE_WORD:FAR
+  EXTRN RECEIVED:BYTE
   ; PATHGEN.asm
   EXTRN xstart:WORD
   EXTRN ystart:WORD
@@ -20,6 +34,7 @@
   PUBLIC RESET_CARS
   PUBLIC UPDATE_CARS
   PUBLIC DRAW_CARS
+  PUBLIC PLAYER_NUMBER
   PUBLIC CAR_X
   PUBLIC CAR_Y
   PUBLIC CAR_PROGRESS
@@ -133,7 +148,6 @@ CHECK_INPUT_UPDATES proc far
   in al, 60h ; read scan code
   cmp AL, 0
   jz EXIT_CHECK_INPUT_UPDATES
-  push AX
   lea DI, CAR1_KEYS
   lea SI, CAR1_POWERS_TIME
   mov AH, 0
@@ -143,17 +157,9 @@ CHECK_INPUT_UPDATES proc far
   call READ_BUFFER
   mov MAIN_KEY_PRESSED[0], AL
   mov SECOND_KEY_PRESSED[0], AH
-  pop AX
-  lea DI, CAR2_KEYS
-  lea SI, CAR2_POWERS_TIME
-  mov AH, 2
-  mov CURRENT_CAR, AH
-  mov DL, MAIN_KEY_PRESSED[1]
-  mov DH, SECOND_KEY_PRESSED[1]
-  call READ_BUFFER
-  mov MAIN_KEY_PRESSED[1], AL
-  mov SECOND_KEY_PRESSED[1], AH
+  call SEND_SERIAL_INPUT
   EXIT_CHECK_INPUT_UPDATES:
+  call CHECK_SERIAL_INPUT
   ret
 CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
@@ -227,19 +233,72 @@ HANDLE_KEYS_PRIORITY proc near          ; CL : Button state, AH: second key, AL:
   ret
 HANDLE_KEYS_PRIORITY endp
 ;-------------------------------------------------------
+SEND_SERIAL_INPUT proc near
+  push AX
+  push CX
+  ; [?00][?00][??]
+  mov AL, MAIN_KEY_PRESSED
+  mov CL, 3
+  shl AL, CL
+  mov AH, SECOND_KEY_PRESSED
+  and AH, 111b
+  or AL, AH
+  mov CL, 2
+  shl AL, CL
+  mov SEND, AL
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  pop CX
+  pop AX
+  ret
+SEND_SERIAL_INPUT endp
+;-------------------------------------------------------
+CHECK_SERIAL_INPUT proc near
+  call RECEIVE_INPUT
+  jz EXIT_CHECK_SERIAL_INPUT
+  mov AL, RECEIVED
+  mov AH, AL
+  and AH, 11100000b
+  mov CL, 5
+  shr AH, CL
+  cmp AH, 4
+  mov MAIN_KEY_PRESSED[1], -1
+  jge SKIP_SERIAL_MAIN
+  mov MAIN_KEY_PRESSED[1], AH
+  SKIP_SERIAL_MAIN:
+  mov AH, AL
+  and AH, 00011100b
+  mov CL, 2
+  shr AH, CL
+  cmp AH, 4
+  mov SECOND_KEY_PRESSED[1], -1
+  jge SKIP_SERIAL_SECOND
+  mov SECOND_KEY_PRESSED[1], AH
+  SKIP_SERIAL_SECOND:
+  EXIT_CHECK_SERIAL_INPUT:
+  ret
+CHECK_SERIAL_INPUT endp
+;-------------------------------------------------------
 ;---------------- HANDLE CAR UPDATES ------------------;
 UPDATE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
+
+  call CHECK_SERIAL_INPUT
   ; Player One
   mov AL, 0
   mov CURRENT_CAR, AL
   call UPDATE_CAR
+
+  call CHECK_SERIAL_INPUT
+
   ; Player Two
   mov AL, 2
   mov CURRENT_CAR, AL
   call UPDATE_CAR
+
+  call CHECK_SERIAL_INPUT
 
   call UPDATE_POWERUPS
   EXIT_UPDATE_CARS:
@@ -263,7 +322,7 @@ UPDATE_CAR proc near
   call HANDLE_MOVEMENT
   ; POWERS
   call DROP_OBSTACLE
-  ;call GET_TRACK_PROGRESS
+  call GET_TRACK_PROGRESS
   ; DISPLAY
   mov CX, OLD_X
   mov DX, OLD_Y
@@ -1063,9 +1122,16 @@ RESET_CARS endp
 LOAD_CARS proc far                        ; AL: Start Direction
   mov BX, xstart
   add BX, 5
-  mov [CAR_X], BX
+  mov CX, BX
   add BX, 9
-  mov [CAR_X + 2], BX
+  mov DX, BX
+  mov AH, 0
+  cmp PLAYER_NUMBER, AH
+  jz PLAYER_ONE_COOR_X
+    xchg CX, DX
+  PLAYER_ONE_COOR_X:
+  mov [CAR_X], CX
+  mov [CAR_X + 2], DX
   cmp AL, UP
   jnz LOAD_CARS_DOWN
   mov [CAR_IMG_DIR], UP
@@ -1088,9 +1154,15 @@ LOAD_CARS proc far                        ; AL: Start Direction
   LOAD_CARS_LEFT:
   mov BX, ystart
   add BX, 5
-  mov [CAR_Y], BX
+  mov CX, BX
   add BX, 9
-  mov [CAR_Y + 2], BX
+  mov DX, BX
+  cmp PLAYER_NUMBER, AH
+  jz PLAYER_ONE_COOR_Y
+    xchg CX, DX
+  PLAYER_ONE_COOR_Y:
+  mov [CAR_Y], CX
+  mov [CAR_Y + 2], DX
   cmp AL, LEFT
   jnz LOAD_CARS_RIGHT
   mov [CAR_IMG_DIR], LEFT
@@ -1269,11 +1341,11 @@ PRINT_TEST proc far
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, MAIN_KEY_PRESSED
+    mov dl, MAIN_KEY_PRESSED[1]
     add dl, '0'
     int 21H
     moveCursor 015H, 02H
-    mov dl, SECOND_KEY_PRESSED
+    mov dl, SECOND_KEY_PRESSED[1]
     add dl, '0'
     int 21H
 

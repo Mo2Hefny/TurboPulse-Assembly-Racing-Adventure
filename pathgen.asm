@@ -2,15 +2,21 @@
   EXTRN CONFIG_PORT:FAR
   EXTRN SEND_INPUT:FAR
   EXTRN WAIT_TILL_SEND:FAR
+  EXTRN SEND_WORD:FAR
+  EXTRN WAIT_TILL_SEND_WORD:FAR
   EXTRN SERIAL_STATUS:BYTE
   EXTRN SEND:BYTE
   ;Receiver.asm
   EXTRN RECEIVE_INPUT:FAR
   EXTRN WAIT_TILL_RECEIVE:FAR
+  EXTRN RECEIVE_WORD:FAR
+  EXTRN WAIT_TILL_RECEIVE_WORD:FAR
   EXTRN RECEIVED:BYTE
-    PUBLIC TRACK
+    ; CARS.asm
+    EXTRN PLAYER_NUMBER:BYTE
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
+    PUBLIC TRACK
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
     PUBLIC RANDOM_SPAWN_POWERUP
@@ -502,7 +508,7 @@ GENERATE_TRACK proc far
                         cmp AL, IsFinished
                         jnz OTHER_DIDNT_FINISH
                         call RESET_TRACK
-                        call Receive_TRACK
+                        call RECEIVE_TRACK
                         ret
                       OTHER_DIDNT_FINISH:
                       ; IF OTHER DIDNT FINISH CONTINUE GENERATING
@@ -718,6 +724,7 @@ GENERATE_TRACK proc far
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
+                      mov PLAYER_NUMBER, 1
                       MOV  boolFinished, 1
                       mov AX, CURR_BLOCK
                       dec AX
@@ -752,7 +759,6 @@ SEND_TRACK proc near
     SEND_FINISHED:
         mov SEND, IsFinished
         call WAIT_TILL_SEND
-    call RECEIVE_INPUT
     ; Make counter for grid
     mov CX, 0
     lea BX, GRID
@@ -770,16 +776,10 @@ SEND_TRACK proc near
     call WAIT_TILL_SEND
     ; SEND START X and Y
     mov AX, xstart
-    mov SEND, AL
-    call WAIT_TILL_SEND
-    mov SEND, AH
-    call WAIT_TILL_SEND
+    call WAIT_TILL_SEND_WORD
     mov AX, ystart
-    mov SEND, AL
-    call WAIT_TILL_SEND
-    mov SEND, AH
-    call WAIT_TILL_SEND
-    ; SEND DIRECTION
+    call WAIT_TILL_SEND_WORD
+    ; Make counter for directions
     mov CX, 0
     lea BX, DIRECTIONS
     SEND_GRID_DIRECTIONS:
@@ -790,56 +790,88 @@ SEND_TRACK proc near
         inc CX
         cmp CX, DIRECTIONS_SIZE
         jnz SEND_GRID_DIRECTIONS
-    ; Make counter for directions
+    ; Send All Entities
+    mov AX, ENTITIES_COUNT
+    call WAIT_TILL_SEND_WORD
+    mov CX, 0
+    lea BX, ENTITIES_TYPE
+    lea SI, ENTITIES_X
+    lea DI, ENTITIES_Y
+    SEND_ENTITIES:
+        mov AX, [BX]
+        call WAIT_TILL_SEND_WORD
+        add BX, 2
+        mov AX, [SI]
+        call WAIT_TILL_SEND_WORD
+        add SI, 2
+        mov AX, [DI]
+        call WAIT_TILL_SEND_WORD
+        add DX, 2
+        inc CX
+        cmp CX, MAX_ENTITIES_NUM
+        jnz SEND_ENTITIES
     ret
 SEND_TRACK endp
 ;-------------------------------------------------------
-Receive_TRACK proc near
-call RECEIVE_INPUT
+RECEIVE_TRACK proc near
     ; Make counter for grid
     mov CX, 0
     lea BX, GRID
-    Receive_GRID_BLOCK:
+    RECEIVE_GRID_BLOCK:
         call WAIT_TILL_RECEIVE
         mov AL, RECEIVED
         mov [BX], AL
         inc BX
         inc CX
         cmp CX, GRID_SIZE
-        jnz Receive_GRID_BLOCK
+        jnz RECEIVE_GRID_BLOCK
     ; Receive LAST BLOCK DEPTH
     call WAIT_TILL_RECEIVE
     mov AL, RECEIVED
     mov FINAL_BLOCK, AL
     ; Receive START X and Y
-    call WAIT_TILL_RECEIVE
-    mov AL, RECEIVED
-    call WAIT_TILL_RECEIVE
-    mov AH, RECEIVED
+    call WAIT_TILL_RECEIVE_WORD
     mov xstart, AX
-    call WAIT_TILL_RECEIVE
-    mov AL, RECEIVED
-    call WAIT_TILL_RECEIVE
-    mov AH, RECEIVED
+    call WAIT_TILL_RECEIVE_WORD
     mov ystart, AX
     ; Make counter for directions
     mov CX, 0
     lea BX, DIRECTIONS
-    Receive_GRID_DIRECTIONS:
+    RECEIVE_GRID_DIRECTIONS:
         call WAIT_TILL_RECEIVE
         mov AL, RECEIVED
         mov [BX], AL
         inc BX
         inc CX
         cmp CX, DIRECTIONS_SIZE
-        jnz Receive_GRID_DIRECTIONS
+        jnz RECEIVE_GRID_DIRECTIONS
+    ; Receive all entities
+    call WAIT_TILL_RECEIVE_WORD
+    mov ENTITIES_COUNT, AX
+    mov CX, 0
+    lea BX, ENTITIES_TYPE
+    lea SI, ENTITIES_X
+    lea DI, ENTITIES_Y
+    RECEIVE_ENTITIES:
+        call WAIT_TILL_RECEIVE_WORD
+        mov [BX], AX
+        add BX, 2
+        call WAIT_TILL_RECEIVE_WORD
+        mov [SI], AX
+        add SI, 2
+        call WAIT_TILL_RECEIVE_WORD
+        mov [DI], AX
+        add DX, 2
+        inc CX
+        cmp CX, MAX_ENTITIES_NUM
+        jnz RECEIVE_ENTITIES
     ; Make counter for directions
     call DRAW_TRACK
     call DECORATE_TRACK
     call Save_Track                   ; Save Track in Array For Further Usage
     mov al, DIRECTIONS                ; Store first direction for cars starting direction
     ret
-Receive_TRACK endp
+RECEIVE_TRACK endp
 ;------------------- DISPLAYING -----------------------;
 DRAW_BLOCK proc near                                    ; AL: block color
   push AX
@@ -1451,6 +1483,7 @@ GET_BLOCK_DIRECTION proc near
     pop CX
     pop BX
     ret
+GET_BLOCK_DIRECTION endp
 ;-------------------------------------------------------
 CHECK_NEARBY_BOXES proc near
     push AX

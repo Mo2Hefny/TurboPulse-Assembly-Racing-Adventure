@@ -145,7 +145,7 @@ main proc far
   call setcurrentleading
   ; Draw
   call DRAW_ENTITIES
-  ;call PRINT_TEST
+  call PRINT_TEST
   call DRAW_CARS
   
   ; Repeat the process
