@@ -1,14 +1,23 @@
+  ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN RECEIVED:BYTE
 PUBLIC GameMenu
 PUBLIC TEMP
 PUBLIC GAME_MENU_INPUT
 PUBLIC getmode
 EXTRN TRACK:FAR
-.model medium
+.model compact
 .stack 64
 .data
 MAINMENUIMG db 'GMenu.bin', 0
 chatmodemsg   db  "Not Available yet",'$'
 GameModes db 0 ;1 for chat 2 for game
+SerialGameModes db 0 ;1 for chat 2 for game
 TEMP DW 0
 INPUT DB -1
 buffer_size equ 64000
@@ -43,19 +52,30 @@ drawImage proc                                         ;Function To Load Track F
 drawImage endp
 MODES PROC
 BEGIN:
-cmp INPUT, -1
-jz BEGIN
-cmp INPUT, 1
-JZ CHAT
-cmp INPUT, 2
-JZ GAME
-cmp INPUT, 0
-JZ EXIT
-JMP BEGIN
+    ; CHECK IF OTHER PLAYER PRESSED PLAYED
+    CALL RECEIVE_INPUT
+    MOV AL, RECEIVED
+    MOV SerialGameModes, AL
+    cmp INPUT, -1
+    jz BEGIN
+    cmp INPUT, 1
+    JZ CHAT
+    cmp INPUT, 2
+    JZ GAME
+    cmp INPUT, 0
+    JZ EXIT
+    JMP BEGIN
 EXIT:mov  ax,4ch
      int  21H
      RET
-GAME: MOV GameModes,2
+GAME: 
+MOV SEND, 2
+OR SERIAL_STATUS, 1
+CALL SEND_INPUT
+; CHECK IF HE WANTS TO PLAY AS WELL
+cmp SerialGameModes, 2
+jnz BEGIN                           ; PRESSED OTHER KEY
+MOV GameModes,2
 ret
 CHAT: mov GameModes,1
     mov  bh, 0    ; page.

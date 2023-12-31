@@ -17,6 +17,7 @@
   EXTRN PRINT_TEST:FAR
   EXTRN UPDATE_CARS:FAR
   EXTRN LOAD_CARS:FAR
+  EXTRN RESET_CARS:FAR
   ;mainmenu.asm
   EXTRN MAINMENU:FAR
   EXTRN p1name:FAR
@@ -30,9 +31,17 @@
   EXTRN CAR_WON:FAR
   EXTRN CAR_PROGRESS:FAR
   EXTRN CAR_POWER:FAR
+  ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN RECEIVED:BYTE
   PUBLIC TIME_AUX
   PUBLIC TIME_SEC
-.model small
+.model compact
 .stack 64
 .data
   GAME_MENU      EQU 1
@@ -78,6 +87,7 @@ main proc far
 
                 mov  ES, AX
   ; Initialize Video Mode
+                call CONFIG_PORT
                 mov  AX, 0013h                      ; Select 320x200, 256 color graphics
                 int  10h
   
@@ -148,6 +158,7 @@ main proc far
 
   ; Terminate Program
   terminate:    
+                call RESET_CARS
                 mov CURR_PAGE, TERMINATION
                 call END_GAME
                 call GETCARINFO

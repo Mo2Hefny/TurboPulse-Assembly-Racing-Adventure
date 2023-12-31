@@ -1,7 +1,16 @@
+  ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN WAIT_TILL_SEND:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN WAIT_TILL_RECEIVE:FAR
+  EXTRN RECEIVED:BYTE
     PUBLIC TRACK
     ; OBSTACLES.asm
     EXTRN ADD_OBSTACLE:FAR
-    EXTRN ENTITIES_COUNT:WORD
     PUBLIC GENERATE_TRACK
     PUBLIC Load_Track
     PUBLIC RANDOM_SPAWN_POWERUP
@@ -12,6 +21,10 @@
     PUBLIC xstart
     PUBLIC ystart
     PUBLIC pathlength
+    PUBLIC ENTITIES_COUNT
+    PUBLIC ENTITIES_TYPE
+    PUBLIC ENTITIES_X
+    PUBLIC ENTITIES_Y
 .model huge
 .stack 64
 .data
@@ -39,6 +52,8 @@
     RIGHT EQU 2
     LEFT EQU 3
     FINISH EQU 4
+    IsFinished EQU '.'
+    MAX_ENTITIES_NUM EQU 500
 
     direction        db ?                ; the randomized direction
 
@@ -55,13 +70,18 @@
     prev_rand        db 0
     FinishLineColor  db 4                ;Color Of Last Sqaure
     boolFinished     db 0                ;To color last Sqaure
-    TRACK            DB 64000 DUP (?)    ;To save and Load Track
+    TRACK            DB 64000 - 6 * MAX_ENTITIES_NUM DUP (?)    ;To save and Load Track
+    ENTITIES_TYPE DW MAX_ENTITIES_NUM dup(-1)
+    ENTITIES_X DW MAX_ENTITIES_NUM dup(-1)                            ; OBSTACLE_Center_X
+    ENTITIES_Y DW MAX_ENTITIES_NUM dup(-1)                            ; OBSTACLE_Center_Y
+    ENTITIES_COUNT DW 0
     Block_Percentage db 0               ;real Percentage
     Block_SIZE       DW 6                ;size of any block(path_block,boosters)
     Boost_Percentage db 10               ;100-this Percentage so if 90 its 10
     GRID             DB (GRID_WIDTH) * (GRID_HEIGHT) dup(-1)
     GRID_SIZE        EQU $-GRID
     DIRECTIONS       DB -1, 100 DUP(-2)   ; -1 (start), 4 (end), -2 (invalid)
+    DIRECTIONS_SIZE        EQU $-DIRECTIONS
     CURR_BLOCK       DW 0
     FINAL_BLOCK      DB 0
     VALID_BOT      DB 0
@@ -456,6 +476,9 @@ GENERATE_TRACK proc far
     ;restart should clear screen and put in sqaurenumbers 0 and move the cx and dx to initial position
                       call RESET_BACKGROUND             ;Resest Our Green BackGround
                       call RESET_TRACK
+                      call RECEIVE_INPUT
+                      mov SEND, 0
+                      mov RECEIVED, 0
     restart:                                            ;Restart Only if less than MinPathLength
                       push ax
                       mov  ax,minpathlength
@@ -472,6 +495,17 @@ GENERATE_TRACK proc far
                       mov  CURR_Y,dx
                       call CREATE_BLOCK
     GENERATE_LOOP:    
+                      ; CHECK OTHER PLAYER
+                      call RECEIVE_INPUT
+                      jz OTHER_DIDNT_FINISH
+                        mov AL, RECEIVED
+                        cmp AL, IsFinished
+                        jnz OTHER_DIDNT_FINISH
+                        call RESET_TRACK
+                        call Receive_TRACK
+                        ret
+                      OTHER_DIDNT_FINISH:
+                      ; IF OTHER DIDNT FINISH CONTINUE GENERATING
                       mov  cx,CURR_X
                       mov  dx,CURR_Y
                       mov BX, GRID_INDEX
@@ -684,12 +718,14 @@ GENERATE_TRACK proc far
                       call STORE_DIRECTION
                       jmp  cont
     Terminate_Program:
-                      ;MOV  boolFinished, 1
+                      MOV  boolFinished, 1
                       mov AX, CURR_BLOCK
                       dec AX
                       mov FINAL_BLOCK, AL
                       mov al, FINISH
                       call STORE_DIRECTION
+                      ; Send track to other player
+                      call SEND_TRACK
                       call DRAW_TRACK
                       call DECORATE_TRACK
                       ;CALL CREATE_BLOCK                 ; Draw Our Final RedSqaure To Represnt End Line
@@ -712,19 +748,103 @@ STORE_DIRECTION proc near
     ret
 STORE_DIRECTION endp
 ;-------------------------------------------------------
+SEND_TRACK proc near
+    SEND_FINISHED:
+        mov SEND, IsFinished
+        call WAIT_TILL_SEND
+    call RECEIVE_INPUT
+    ; Make counter for grid
+    mov CX, 0
+    lea BX, GRID
+    SEND_GRID_BLOCK:
+        mov AL, [BX]
+        mov SEND, AL
+        call WAIT_TILL_SEND
+        inc BX
+        inc CX
+        cmp CX, GRID_SIZE
+        jnz SEND_GRID_BLOCK
+    ; SEND LAST BLOCK DEPTH
+    mov AL, FINAL_BLOCK
+    mov SEND, AL
+    call WAIT_TILL_SEND
+    ; SEND START X and Y
+    mov AX, xstart
+    mov SEND, AL
+    call WAIT_TILL_SEND
+    mov SEND, AH
+    call WAIT_TILL_SEND
+    mov AX, ystart
+    mov SEND, AL
+    call WAIT_TILL_SEND
+    mov SEND, AH
+    call WAIT_TILL_SEND
+    ; SEND DIRECTION
+    mov CX, 0
+    lea BX, DIRECTIONS
+    SEND_GRID_DIRECTIONS:
+        mov AL, [BX]
+        mov SEND, AL
+        call WAIT_TILL_SEND
+        inc BX
+        inc CX
+        cmp CX, DIRECTIONS_SIZE
+        jnz SEND_GRID_DIRECTIONS
+    ; Make counter for directions
+    ret
+SEND_TRACK endp
+;-------------------------------------------------------
+Receive_TRACK proc near
+call RECEIVE_INPUT
+    ; Make counter for grid
+    mov CX, 0
+    lea BX, GRID
+    Receive_GRID_BLOCK:
+        call WAIT_TILL_RECEIVE
+        mov AL, RECEIVED
+        mov [BX], AL
+        inc BX
+        inc CX
+        cmp CX, GRID_SIZE
+        jnz Receive_GRID_BLOCK
+    ; Receive LAST BLOCK DEPTH
+    call WAIT_TILL_RECEIVE
+    mov AL, RECEIVED
+    mov FINAL_BLOCK, AL
+    ; Receive START X and Y
+    call WAIT_TILL_RECEIVE
+    mov AL, RECEIVED
+    call WAIT_TILL_RECEIVE
+    mov AH, RECEIVED
+    mov xstart, AX
+    call WAIT_TILL_RECEIVE
+    mov AL, RECEIVED
+    call WAIT_TILL_RECEIVE
+    mov AH, RECEIVED
+    mov ystart, AX
+    ; Make counter for directions
+    mov CX, 0
+    lea BX, DIRECTIONS
+    Receive_GRID_DIRECTIONS:
+        call WAIT_TILL_RECEIVE
+        mov AL, RECEIVED
+        mov [BX], AL
+        inc BX
+        inc CX
+        cmp CX, DIRECTIONS_SIZE
+        jnz Receive_GRID_DIRECTIONS
+    ; Make counter for directions
+    call DRAW_TRACK
+    call DECORATE_TRACK
+    call Save_Track                   ; Save Track in Array For Further Usage
+    mov al, DIRECTIONS                ; Store first direction for cars starting direction
+    ret
+Receive_TRACK endp
 ;------------------- DISPLAYING -----------------------;
 DRAW_BLOCK proc near                                    ; AL: block color
   push AX
   push BX
-  cmp  boolFinished,0
-  jz   no
-  mov  ah, 0ch
-  mov  al, FinishLineColor
-  JMP  YES
-  no:               
   mov  ax,0c08h
-  YES:              
-  
   ;mov  cx, CURR_X
   ;mov  dx, CURR_Y
   call GET_GRID_INDEX
