@@ -19,6 +19,7 @@
   EXTRN LOAD_CARS:FAR
   EXTRN RESET_CARS:FAR
   EXTRN PLAYER_NUMBER:BYTE
+  EXTRN PRESSED_F4:BYTE
   ;mainmenu.asm
   EXTRN MAINMENU:FAR
   EXTRN p1name:FAR
@@ -110,6 +111,7 @@ main proc far
   GameMenulabel:
                 mov CURR_PAGE, GAME_MENU
                 CALL GameMenu                       ; AL has the game mode
+                call RECEIVE_INPUT
                 cmp AL, CHAT
                 jnz CHECK_PLAY
                   call RESTORE_INT9
@@ -149,10 +151,13 @@ main proc far
   call setcurrentleading
   ; Draw
   call DRAW_ENTITIES
-  call PRINT_TEST
+  ;call PRINT_TEST
   call DRAW_CARS
   
   ; Repeat the process
+                mov AL, 1
+                cmp PRESSED_F4, AL
+                jz   SHOW_SCORE
                 CALL GETCARINFO
                 cmp  AL,1
                 jz   terminate
@@ -161,8 +166,8 @@ main proc far
                 jmp  CHECK_TIME
 
   ; Terminate Program
+  SHOW_SCORE:   call RESET_BACKGROUND
   terminate:    
-                call RESET_CARS
                 mov CURR_PAGE, TERMINATION
                 call END_GAME
                 call GETCARINFO
@@ -172,8 +177,10 @@ main proc far
                 jz   withoutdelay
   withdelay:    
                 call delay_proc
+                call RESET_CARS
                 jmp  GameMenulabel
   withoutdelay: call PlaySound
+                call RESET_CARS
                 jmp  GameMenulabel
 main endp
   ;-------------------------------------------------------
@@ -660,4 +667,16 @@ RESTORE_INT9 proc
   ret
 RESTORE_INT9 endp
   ;-------------------------------------------------------
+  RESET_BACKGROUND proc near
+    ; (Send to TRACK file)
+    ; Set background color to WHITE
+                      mov  AH, 06h                      ; Scroll up function
+                      xor  AL, AL                       ; Clear entire screen
+                      xor  CX, CX                       ; Upper left corner CH=row, CL=column
+                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  BH, 012h                       ; Green-BackGround
+                      int  10h
+                      ret
+RESET_BACKGROUND endp
+;-------------------------------------------------------
 end main

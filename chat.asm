@@ -210,6 +210,11 @@ CHATTING proc far
                mov  al, 3
                int  10h
 
+              mov CX, 4
+              clear:
+                call scroll1
+                call scroll2
+                loop clear
 
     ;;mov cursor to myname
                mov  ah,2
@@ -309,7 +314,13 @@ notback:
     ;Check that Transmitter Holding Register is Empty
                mov  dx , 3FDH         ; Line Status Register
     AGAIN:     
-              call SEND_INPUT
+               In   al , dx           ;Read Line Status
+               AND  al , 00100000B
+               JZ   next
+    ;If empty put the VALUE in Transmit data register
+               mov  dx , 3F8H         ; Transmit data register
+               mov  al,VALUE
+               out  dx , al
     next:      
     CHK:       
                mov  dx , 3FDH         ; Line Status Register
@@ -375,13 +386,17 @@ notback2:
                pop  ax
                jmp  again1
     exit:      
-                mov dx,0a0ah
-                mov ah,2
-                int 10h
-                mov ah,9
-                lea dx,exitmessage
-                int 21h    
-                hlt
+                mov  AX, 0013h                      ; Select 320x200, 256 color graphics
+                int  10h
+  
+  ; By default, there are 16 colors for text and only 8 colors for background.
+  ; There is a way to get all the 16 colors for background, which requires turning off the "blinking attribute".
+  ; Toggle Intensity/Blinking Bit
+                mov  AX, 1003h
+                mov  BX, 0000h                      ; 00h Background intensity enabled
+  ; 01h Blink enabled
+                int  10h   
+                ret
 
 CHATTING endp
 end

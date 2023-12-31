@@ -2,7 +2,8 @@ EXTRN TRACK:FAR
 EXTRN GETCARINFO:FAR
 EXTRN p1name:FAR
 EXTRN p2name:FAR
-EXTRN getsizes:FAR
+EXTRN getsizes:FAR 
+EXTRN PRESSED_F4:BYTE 
 PUBLIC END_GAME
 .model huge
 .stack 64
@@ -54,6 +55,11 @@ END_GAME PROC FAR
     MOV AX,@DATA
     MOV ds,AX
     mov es,ax
+    mov AL, 1
+    cmp PRESSED_F4, AL
+    jnz NO_SCORE_LEAVE
+    jmp far ptr printscore
+    NO_SCORE_LEAVE:
     call GETCARINFO
     mov WhoWon,al
     call getsizes

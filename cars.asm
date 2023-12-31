@@ -36,6 +36,7 @@
   PUBLIC UPDATE_CARS
   PUBLIC DRAW_CARS
   PUBLIC PLAYER_NUMBER
+  PUBLIC PRESSED_F4
   PUBLIC CAR_X
   PUBLIC CAR_Y
   PUBLIC CAR_PROGRESS
@@ -104,6 +105,7 @@ endm
   CURRENT_MAIN_VELOCITY DW ?
   CURRENT_SEC_VELOCITY DW ?
   CAR_WON DB 0                                        ; 1 First car, 2 Second car
+  PRESSED_F4 DB 0
   t DB 0                                        ; 1 First car, 2 Second car
   y DB 0                                        ; 1 First car, 2 Second car
 
@@ -152,6 +154,11 @@ CHECK_INPUT_UPDATES proc far
   in al, 60h ; read scan code
   cmp AL, 0
   jz EXIT_CHECK_INPUT_UPDATES
+  cmp AL, 3EH
+  jnz NO_LEAVING
+  call LEAVE_GAME
+  ret
+  NO_LEAVING:
   lea DI, CAR1_KEYS
   lea SI, CAR1_POWERS_TIME
   mov AH, 0
@@ -298,6 +305,11 @@ CHECK_SERIAL_INPUT proc near
   caLL RECEIVE_POWER_SERIAL_INPUT
   ret
   SKIP_POWER_READ:
+  cmp AL, 3
+  jnz SKIP_LEAVING
+  mov PRESSED_F4, 1
+  ret
+  SKIP_LEAVING:
   EXIT_CHECK_SERIAL_INPUT:
   ret
 CHECK_SERIAL_INPUT endp
@@ -336,6 +348,13 @@ RECEIVE_POWER_SERIAL_INPUT proc near
   SKIP_SERIAL_POWER_ACTIVATE:
   ret
 RECEIVE_POWER_SERIAL_INPUT endp
+;-------------------------------------------------------
+LEAVE_GAME proc near
+  mov PRESSED_F4, 1
+  mov SEND, 00000011b
+  call WAIT_TILL_SEND
+  ret
+LEAVE_GAME endp
 ;-------------------------------------------------------
 ;---------------- HANDLE CAR UPDATES ------------------;
 UPDATE_CARS proc far
@@ -1186,6 +1205,7 @@ RESET_CARS proc far
   mov SECOND_KEY_PRESSED, -1
   mov SECOND_KEY_PRESSED[1], -1
   mov PLAYER_NUMBER, 1
+  mov PRESSED_F4, 0
   ret
 RESET_CARS endp
 ;-------------------------------------------------------
