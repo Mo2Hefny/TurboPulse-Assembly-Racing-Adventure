@@ -17,12 +17,17 @@
   EXTRN PRINT_TEST:FAR
   EXTRN UPDATE_CARS:FAR
   EXTRN LOAD_CARS:FAR
+  EXTRN RESET_CARS:FAR
+  EXTRN PLAYER_NUMBER:BYTE
+  EXTRN PRESSED_F4:BYTE
   ;mainmenu.asm
   EXTRN MAINMENU:FAR
   EXTRN p1name:FAR
   EXTRN p2name:FAR
   EXTRN p1actual:FAR
   EXTRN p2actual:FAR
+  ; CHAT.asm
+  EXTRN CHATTING:FAR
   ;sound
   EXTRN PlaySound:FAR
   ;END_GAME.asm
@@ -30,14 +35,22 @@
   EXTRN CAR_WON:FAR
   EXTRN CAR_PROGRESS:FAR
   EXTRN CAR_POWER:FAR
+  ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN RECEIVED:BYTE
   PUBLIC TIME_AUX
   PUBLIC TIME_SEC
-.model small
+.model compact
 .stack 64
 .data
-  GAME_MENU      EQU 1
-  CHATTING       EQU 2
-  RACING         EQU 3
+  GAME_MENU      EQU 0
+  CHAT           EQU 1
+  RACING         EQU 2
   TERMINATION    EQU 4
   CURR_PAGE      DB  0               ; Used when checking if time has changed.code
   TIME_AUX       DB  0               ; Used when checking if time has changed.code
@@ -70,6 +83,8 @@
                  DB  43, 43, 43, 43, 43, 140 ,21, 140, 43, 43, 43, 43, 43, 43
                  DB  43, 162, 21, 140, 43, 43, 43, 43, 43, 43, 43, 21, 21, 162
                  DB  140, 140, 140, 140, 140, 140, 140, 21
+  origInt9Segment DW ?
+  origInt9Offset DW ?
 .code
   ;-------------------------------------------------------
 main proc far
@@ -78,6 +93,7 @@ main proc far
 
                 mov  ES, AX
   ; Initialize Video Mode
+                call CONFIG_PORT
                 mov  AX, 0013h                      ; Select 320x200, 256 color graphics
                 int  10h
   
@@ -89,21 +105,20 @@ main proc far
   ; 01h Blink enabled
                 int  10h
                 call MAINMENU
-                cli
-                push ds
-                mov  ax,cs
-                mov  ds,ax
-                mov  ax,2509h
-                lea  dx, KEYBOARD_INTERRUPT
-                int  21h
-                pop  ds
-                sti                                 ;Generate Track
+                call OVERRIDE_INT                                 ;Generate Track
                 mov  AX, @data
                 mov  DS, AX
   GameMenulabel:
                 mov CURR_PAGE, GAME_MENU
-                CALL GameMenu
-  ;CALL getmode
+                CALL GameMenu                       ; AL has the game mode
+                call RECEIVE_INPUT
+                cmp AL, CHAT
+                jnz CHECK_PLAY
+                  call RESTORE_INT9
+                  call CHATTING
+                  call OVERRIDE_INT
+                  jmp GameMenulabel
+                CHECK_PLAY:
                 mov min, 2
                 mov sec, 1
                 call GENERATE_TRACK                 ; Return Starting Direction in AL
@@ -112,6 +127,7 @@ main proc far
                 int  21h
                 mov  TIME_SEC,dh
                 mov CURR_PAGE, RACING
+                call RECEIVE_INPUT
   ;Get the systen time
   CHECK_TIME:   
                 mov  AH, 2Ch
@@ -139,6 +155,9 @@ main proc far
   call DRAW_CARS
   
   ; Repeat the process
+                mov AL, 1
+                cmp PRESSED_F4, AL
+                jz   SHOW_SCORE
                 CALL GETCARINFO
                 cmp  AL,1
                 jz   terminate
@@ -147,6 +166,7 @@ main proc far
                 jmp  CHECK_TIME
 
   ; Terminate Program
+  SHOW_SCORE:   call RESET_BACKGROUND
   terminate:    
                 mov CURR_PAGE, TERMINATION
                 call END_GAME
@@ -157,8 +177,10 @@ main proc far
                 jz   withoutdelay
   withdelay:    
                 call delay_proc
+                call RESET_CARS
                 jmp  GameMenulabel
   withoutdelay: call PlaySound
+                call RESET_CARS
                 jmp  GameMenulabel
 main endp
   ;-------------------------------------------------------
@@ -613,4 +635,48 @@ setcurrentleading proc
   exitcrown:          ret
 setcurrentleading endp
   ;-------------------------------------------------------
+OVERRIDE_INT PROC
+  cli
+  mov ax, 3509h
+  int 21h
+  mov origInt9Offset, bx
+  mov origInt9Segment, es
+  push ds
+  mov ax, cs
+  mov ds, ax
+  mov ax, 2509h
+  lea dx, KEYBOARD_INTERRUPT
+  int 21h
+  pop ds
+  sti
+  mov ax, 0A000h
+  mov es,ax
+  ret
+OVERRIDE_INT ENDP
+  ;-------------------------------------------------------
+RESTORE_INT9 proc
+  cli
+  mov ax, origInt9Segment
+  mov dx, origInt9Offset
+  push ds
+  mov ds, ax
+  mov ax, 2509h
+  int 21h
+  pop ds
+  sti
+  ret
+RESTORE_INT9 endp
+  ;-------------------------------------------------------
+  RESET_BACKGROUND proc near
+    ; (Send to TRACK file)
+    ; Set background color to WHITE
+                      mov  AH, 06h                      ; Scroll up function
+                      xor  AL, AL                       ; Clear entire screen
+                      xor  CX, CX                       ; Upper left corner CH=row, CL=column
+                      mov  DX, 184Fh                    ; lower right corner DH=row, DL=column
+                      mov  BH, 012h                       ; Green-BackGround
+                      int  10h
+                      ret
+RESET_BACKGROUND endp
+;-------------------------------------------------------
 end main

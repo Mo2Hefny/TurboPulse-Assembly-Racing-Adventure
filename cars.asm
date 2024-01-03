@@ -2,6 +2,20 @@
   ; GAME.asm
   EXTRN TIME_AUX:BYTE
   EXTRN TIME_SEC:BYTE
+    ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN WAIT_TILL_SEND:FAR
+  EXTRN SEND_WORD:FAR
+  EXTRN WAIT_TILL_SEND_WORD:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN WAIT_TILL_RECEIVE:FAR
+  EXTRN RECEIVE_WORD:FAR
+  EXTRN WAIT_TILL_RECEIVE_WORD:FAR
+  EXTRN RECEIVED:BYTE
   ; PATHGEN.asm
   EXTRN xstart:WORD
   EXTRN ystart:WORD
@@ -12,13 +26,17 @@
   ; OBSTACLES.asm
   EXTRN ADD_OBSTACLE:FAR
   EXTRN CHECK_COLLISION:FAR
+  EXTRN SPAWN_ENTITY:BYTE
   ; PUBLIC
   PUBLIC CHECK_INPUT_UPDATES
   PUBLIC GETCARINFO
   PUBLIC PRINT_TEST
   PUBLIC LOAD_CARS
+  PUBLIC RESET_CARS
   PUBLIC UPDATE_CARS
   PUBLIC DRAW_CARS
+  PUBLIC PLAYER_NUMBER
+  PUBLIC PRESSED_F4
   PUBLIC CAR_X
   PUBLIC CAR_Y
   PUBLIC CAR_PROGRESS
@@ -29,7 +47,7 @@
     mov ah, 2H
     int 10h  
 endm
-.model small
+.model compact
 .data
   ; Red Car
   img1  DB 184, 113, 6, 137, 233, 184, 113, 6, 137, 136, 235, 6, 41, 137, 21, 235, 6, 41, 137, 21, 170, 161, 138, 163, 170, 244, 27, 75, 74, 20, 113, 137, 163, 138, 137, 112, 4, 6, 6, 136 
@@ -43,8 +61,8 @@ endm
   CAR_WIDTH             EQU 05h               ; The width of all cars
   CAR_HEIGHT            EQU 09h               ; The height of all cars
   CAR_SPEED             EQU 2
-  ACCELERATION_INCREASE EQU 2
-  ACCELERATION_DECREASE EQU 1
+  ACCELERATION_INCREASE EQU 8
+  ACCELERATION_DECREASE EQU 8
   MAX_ACCELERATION      EQU 8
   
   GAME_BORDER_X_MIN     EQU 0                ; track boundries
@@ -75,16 +93,21 @@ endm
   POWERUPS_COUNT EQU 4
 
   ; Variables
+  PLAYER_NUMBER DB 1
   OLD_TIME_AUX DB 0
   OLD_TIME_SEC DB 0
   OLD_X DW ?
   OLD_Y DW ?
   CURRENT_KEY DW 0000h
   CURRENT_CAR DB ?
+  POWER_USED DB ?
   CURRENT_MOVEMENT DB ?
   CURRENT_MAIN_VELOCITY DW ?
   CURRENT_SEC_VELOCITY DW ?
   CAR_WON DB 0                                        ; 1 First car, 2 Second car
+  PRESSED_F4 DB 0
+  t DB 0                                        ; 1 First car, 2 Second car
+  y DB 0                                        ; 1 First car, 2 Second car
 
   CAR_X DW 0Ah, 2Ah                                   ; CenterX position of player1, player2
   CAR_Y DW 3Ah, 3Ah                                   ; CenterY position of player1, player2
@@ -131,7 +154,11 @@ CHECK_INPUT_UPDATES proc far
   in al, 60h ; read scan code
   cmp AL, 0
   jz EXIT_CHECK_INPUT_UPDATES
-  push AX
+  cmp AL, 3EH
+  jnz NO_LEAVING
+  call LEAVE_GAME
+  ret
+  NO_LEAVING:
   lea DI, CAR1_KEYS
   lea SI, CAR1_POWERS_TIME
   mov AH, 0
@@ -141,17 +168,8 @@ CHECK_INPUT_UPDATES proc far
   call READ_BUFFER
   mov MAIN_KEY_PRESSED[0], AL
   mov SECOND_KEY_PRESSED[0], AH
-  pop AX
-  lea DI, CAR2_KEYS
-  lea SI, CAR2_POWERS_TIME
-  mov AH, 2
-  mov CURRENT_CAR, AH
-  mov DL, MAIN_KEY_PRESSED[1]
-  mov DH, SECOND_KEY_PRESSED[1]
-  call READ_BUFFER
-  mov MAIN_KEY_PRESSED[1], AL
-  mov SECOND_KEY_PRESSED[1], AH
   EXIT_CHECK_INPUT_UPDATES:
+  call CHECK_SERIAL_INPUT
   ret
 CHECK_INPUT_UPDATES endp
 ;-------------------------------------------------------
@@ -177,6 +195,7 @@ READ_BUFFER proc near                   ; [DI]: CAR_KEYS_TO_CHECK, [BX]: CAR_KEY
   
   and CL, 1                             ; 1 if pressed, 0 if released
   call HANDLE_KEYS_PRIORITY
+  call SEND_MOVEMENT_SERIAL_INPUT
   EXIT_READ_KEYBOARD:
     ret
 READ_BUFFER endp
@@ -225,15 +244,132 @@ HANDLE_KEYS_PRIORITY proc near          ; CL : Button state, AH: second key, AL:
   ret
 HANDLE_KEYS_PRIORITY endp
 ;-------------------------------------------------------
+SEND_SERIAL_INPUT proc near
+  push AX
+  push CX
+  ; [?00][?00][??]
+  mov AL, MAIN_KEY_PRESSED
+  mov CL, 3
+  shl AL, CL
+  mov AH, SECOND_KEY_PRESSED
+  and AH, 111b
+  or AL, AH
+  mov CL, 2
+  shl AL, CL
+  mov SEND, AL
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  pop CX
+  pop AX
+  ret
+SEND_SERIAL_INPUT endp
+;-------------------------------------------------------
+SEND_MOVEMENT_SERIAL_INPUT proc near    ; AL: MAIN_MOVEMENT, AH: SECONDARY_MOVEMENT
+  ; [?00][?00][00]
+  push AX
+  push CX
+  mov CL, 3
+  shl AL, CL
+  and AH, 111b
+  or AL, AH
+  mov CL, 2
+  shl AL, CL
+  mov SEND, AL
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  pop CX
+  pop AX
+  ret
+SEND_MOVEMENT_SERIAL_INPUT endp
+;-------------------------------------------------------
+SEND_POWER_SERIAL_INPUT proc near
+  ; [?00][?00][01]
+  mov SEND, 10000001b
+  mov SERIAL_STATUS, 1
+  call SEND_INPUT
+  ret
+SEND_POWER_SERIAL_INPUT endp
+;-------------------------------------------------------
+CHECK_SERIAL_INPUT proc near
+  call RECEIVE_INPUT
+  jz EXIT_CHECK_SERIAL_INPUT
+  mov AL, RECEIVED
+  and AL, 11b
+  cmp AL, 0                                       ; [?XX][?XX][00]
+  jnz SKIP_MOVEMENT_READ
+  call RECEIVE_MOVEMENT_SERIAL_INPUT
+  ret
+  SKIP_MOVEMENT_READ:
+  cmp AL, 1                                       ; [?XX][?XX][01]
+  jnz SKIP_POWER_READ
+  caLL RECEIVE_POWER_SERIAL_INPUT
+  ret
+  SKIP_POWER_READ:
+  cmp AL, 3
+  jnz SKIP_LEAVING
+  mov PRESSED_F4, 1
+  ret
+  SKIP_LEAVING:
+  EXIT_CHECK_SERIAL_INPUT:
+  ret
+CHECK_SERIAL_INPUT endp
+;-------------------------------------------------------
+RECEIVE_MOVEMENT_SERIAL_INPUT proc near
+  mov AL, RECEIVED
+  mov AH, AL
+  and AH, 11100000b
+  mov CL, 5
+  shr AH, CL
+  cmp AH, 4
+  mov MAIN_KEY_PRESSED[1], -1
+  jge SKIP_SERIAL_MAIN
+  mov MAIN_KEY_PRESSED[1], AH
+  SKIP_SERIAL_MAIN:
+  mov AH, AL
+  and AH, 00011100b
+  mov CL, 2
+  shr AH, CL
+  cmp AH, 4
+  mov SECOND_KEY_PRESSED[1], -1
+  jge SKIP_SERIAL_SECOND
+  mov SECOND_KEY_PRESSED[1], AH
+  SKIP_SERIAL_SECOND:
+  ret
+RECEIVE_MOVEMENT_SERIAL_INPUT endp
+;-------------------------------------------------------
+RECEIVE_POWER_SERIAL_INPUT proc near
+  mov AL, RECEIVED
+  mov AH, AL
+  and AH, 10000000b
+  cmp AH, 10000000b
+  jnz SKIP_SERIAL_POWER_ACTIVATE
+  lea SI, CAR2_POWERS_TIME
+  call USE_POWERUP
+  SKIP_SERIAL_POWER_ACTIVATE:
+  ret
+RECEIVE_POWER_SERIAL_INPUT endp
+;-------------------------------------------------------
+LEAVE_GAME proc near
+  mov PRESSED_F4, 1
+  mov SEND, 00000011b
+  call WAIT_TILL_SEND
+  ret
+LEAVE_GAME endp
+;-------------------------------------------------------
 ;---------------- HANDLE CAR UPDATES ------------------;
 UPDATE_CARS proc far
   mov AX, @data
   mov ES, AX
   mov CX, 0
+
+  call CHECK_SERIAL_INPUT
   ; Player One
   mov AL, 0
   mov CURRENT_CAR, AL
   call UPDATE_CAR
+
+  call CHECK_SERIAL_INPUT
+
   ; Player Two
   mov AL, 2
   mov CURRENT_CAR, AL
@@ -401,6 +537,19 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   SKIP_ACC_CHECKS:
   ; Position = Position + (Velocity + Boost) * Acceleration
   ; DX = (Velocity + Boost) * Acceleration(DX) * delta(T)
+  mov AX, 0
+  cmp [DI], AX
+  jnl not_neg
+    mov AX, -1
+    jmp acc
+  not_neg:
+  jnz not_equal
+    mov AX, 0
+    jmp acc
+  not_equal:
+    mov AX, 1
+  acc:
+  mov [DI], AX
   call USE_SPEED_RELATED_POWERUP
   mov AX, [DI]
   imul BL                               ; (Velocity + Boost) * Acceleration(DX)
@@ -408,17 +557,17 @@ HANDLE_ACCELERATION proc near           ; [DI]: CAR_ACCELERATION, [SI]: IMG_DIR
   ;sub DL, OLD_TIME_AUX                 ; delta(T) = New T - Old T
   ;mul DL                               ; (Velocity + Boost) * Acceleration(DX) * delta(T)
                                         ; NOT WORKING XD
-  mov CL, 3                            
-  SAR AX, CL                            ; To make acceleration smaller
+  ;mov CL, 3                            
+  ;SAR AX, CL                            ; To make acceleration smaller
   mov CURRENT_MAIN_VELOCITY, AX                            ; (Velocity + Boost) * Acceleration(DX)
-  cmp AX, 0
-  jnl SKIP_FIXING_ACC
-  mov BL, -1
-  imul BL
-  SKIP_FIXING_ACC:
-  mov BL, 2
-  idiv BL
-  CBW
+  ;cmp AX, 0
+  ;jnl SKIP_FIXING_ACC
+  ;mov BL, -1
+  ;imul BL
+  ;SKIP_FIXING_ACC:
+  ;mov BL, 2
+  ;idiv BL
+  ;CBW
   mov CURRENT_SEC_VELOCITY, AX
   ret
 HANDLE_ACCELERATION endp
@@ -919,6 +1068,7 @@ USE_POWERUP proc near                     ; [SI]: POWERUPS_TIME
   add SI, BX
   mov AH, 5
   mov [SI], AH                      ; Update Powerup Time
+  call SEND_POWER_SERIAL_INPUT
   EXIT_USE_POWERUP:
   ret
 USE_POWERUP endp
@@ -1044,7 +1194,7 @@ GET_TRACK_PROGRESS proc near
   ret
 GET_TRACK_PROGRESS endp
 ;-------------------------------------------------------
-LOAD_CARS proc far                        ; AL: Start Direction
+RESET_CARS proc far
   mov CAR_WON, 0
   mov CAR_PROGRESS, 0
   mov CAR_PROGRESS[1], 0
@@ -1054,11 +1204,24 @@ LOAD_CARS proc far                        ; AL: Start Direction
   mov MAIN_KEY_PRESSED[1], -1
   mov SECOND_KEY_PRESSED, -1
   mov SECOND_KEY_PRESSED[1], -1
+  mov PLAYER_NUMBER, 1
+  mov PRESSED_F4, 0
+  ret
+RESET_CARS endp
+;-------------------------------------------------------
+LOAD_CARS proc far                        ; AL: Start Direction
   mov BX, xstart
   add BX, 5
-  mov [CAR_X], BX
+  mov CX, BX
   add BX, 9
-  mov [CAR_X + 2], BX
+  mov DX, BX
+  mov AH, 1
+  cmp PLAYER_NUMBER, AH
+  jz PLAYER_ONE_COOR_X
+    xchg CX, DX
+  PLAYER_ONE_COOR_X:
+  mov [CAR_X], CX
+  mov [CAR_X + 2], DX
   cmp AL, UP
   jnz LOAD_CARS_DOWN
   mov [CAR_IMG_DIR], UP
@@ -1081,9 +1244,15 @@ LOAD_CARS proc far                        ; AL: Start Direction
   LOAD_CARS_LEFT:
   mov BX, ystart
   add BX, 5
-  mov [CAR_Y], BX
+  mov CX, BX
   add BX, 9
-  mov [CAR_Y + 2], BX
+  mov DX, BX
+  cmp PLAYER_NUMBER, AH
+  jz PLAYER_ONE_COOR_Y
+    xchg CX, DX
+  PLAYER_ONE_COOR_Y:
+  mov [CAR_Y], CX
+  mov [CAR_Y + 2], DX
   cmp AL, LEFT
   jnz LOAD_CARS_RIGHT
   mov [CAR_IMG_DIR], LEFT
@@ -1254,19 +1423,19 @@ PRINT_TEST proc far
 
     moveCursor 0CH, 02H
     mov ah, 2h
-    mov dl, MAIN_KEY_PRESSED
+    mov dl, SPAWN_ENTITY
     add dl, '0'
     int 21H
     moveCursor 0FH, 02H
-    mov dl, SECOND_KEY_PRESSED
+    mov dl, t
     add dl, '0'
     int 21H
     moveCursor 012H, 02H
-    mov dl, MAIN_KEY_PRESSED
+    mov dl, y
     add dl, '0'
     int 21H
     moveCursor 015H, 02H
-    mov dl, SECOND_KEY_PRESSED
+    mov dl, SECOND_KEY_PRESSED[1]
     add dl, '0'
     int 21H
 

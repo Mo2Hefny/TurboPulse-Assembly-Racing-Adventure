@@ -1,14 +1,25 @@
+  ; Sender.asm
+  EXTRN CONFIG_PORT:FAR
+  EXTRN SEND_INPUT:FAR
+  EXTRN SERIAL_STATUS:BYTE
+  EXTRN SEND:BYTE
+  ;Receiver.asm
+  EXTRN RECEIVE_INPUT:FAR
+  EXTRN RECEIVED:BYTE
 PUBLIC GameMenu
 PUBLIC TEMP
 PUBLIC GAME_MENU_INPUT
 PUBLIC getmode
 EXTRN TRACK:FAR
-.model medium
+.model compact
 .stack 64
 .data
 MAINMENUIMG db 'GMenu.bin', 0
-chatmodemsg   db  "Not Available yet",'$'
+chatmodemsg   db  " Check The Chat  ",'$'
+playmodemsg   db  "   Let's Play    ",'$'
+emptymodemsg   db  "                 ",'$'
 GameModes db 0 ;1 for chat 2 for game
+SerialGameModes db 0 ;1 for chat 2 for game
 TEMP DW 0
 INPUT DB -1
 buffer_size equ 64000
@@ -42,34 +53,82 @@ drawImage proc                                         ;Function To Load Track F
                       ret
 drawImage endp
 MODES PROC
+    mov input, -1
+    mov GameModes, -1
+    mov SerialGameModes, -1
 BEGIN:
-cmp INPUT, -1
-jz BEGIN
-cmp INPUT, 1
-JZ CHAT
-cmp INPUT, 2
-JZ GAME
-cmp INPUT, 0
-JZ EXIT
-JMP BEGIN
+    ; CHECK IF OTHER PLAYER PRESSED PLAYED
+    CALL RECEIVE_INPUT
+    MOV AL, RECEIVED
+    MOV SerialGameModes, AL
+    call SHOW_MSGS
+    cmp INPUT, -1
+    jz BEGIN
+    cmp INPUT, 1
+    JZ CHAT
+    cmp INPUT, 2
+    JZ GAME
+    cmp INPUT, 0
+    JZ EXIT
+    JMP BEGIN
 EXIT:mov  ax,4ch
      int  21H
      RET
-GAME: MOV GameModes,2
+GAME: 
+MOV SEND, 2
+CALL SEND_INPUT
+; CHECK IF HE WANTS TO PLAY AS WELL
+cmp SerialGameModes, 2
+jnz BEGIN                           ; PRESSED OTHER KEY
+MOV GameModes, 2
+mov AL, 2
 ret
-CHAT: mov GameModes,1
+CHAT: 
+    MOV SEND, 1
+    CALL SEND_INPUT
+    cmp SerialGameModes, 1
+    jnz BEGIN
+    mov GameModes, 1
+    mov AL, 1
+    ret
+JMP BEGIN
+MODES ENDP
+;------------------------------------------------------------------------------
+SHOW_MSGS proc near
+    ; CHECK IF HE WANTS TO PLAY AS WELL
     mov  bh, 0    ; page.
-    lea  bp, chatmodemsg  ; offset.
     mov  bl, 012D ; default attribute.
     mov  cx, 0  ; char number.
     mov  cl,017D
     mov  dl, 11    ; col.
-    mov  dh, 6   ; row.
     mov  ah, 13h    ; function.
     mov  al, 0h    ; sub-function.
+    cmp SerialGameModes, 1
+    jz PRINT_CHAT_MSG
+    cmp SerialGameModes, 2
+    jz PRINT_PLAY_MSG
+    ret
+
+    PRINT_CHAT_MSG:
+    lea  bp, chatmodemsg  ; offset.
+    mov  dh, 6   ; row.
     int  10h
-JMP BEGIN
-MODES ENDP
+    lea  bp, emptymodemsg  ; offset.
+    mov  dh, 9   ; row.
+    int  10h
+    ret
+
+    PRINT_PLAY_MSG:
+    lea  bp, emptymodemsg  ; offset.
+    mov  dh, 6   ; row.
+    int  10h
+    lea  bp, playmodemsg  ; offset.
+    mov  dh, 9   ; row.
+    int  10h
+    ret
+
+SHOW_MSGS endp
+;------------------------------------------------------------------------------
 getmode proc
 mov cl,GameModes
 getmode endp
