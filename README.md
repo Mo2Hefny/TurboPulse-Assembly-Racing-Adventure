@@ -42,8 +42,7 @@ This racing game is designed for two players who can either chat with each other
 ## Controls
 - Chat Mode:
   - Use the keyboard to type messages.
-  - Press Enter to send messages.
-
+   
 - Game Mode:
   - Cars Controls:
     - `Arrow Up`: Move upwards
